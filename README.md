@@ -171,8 +171,9 @@ flowchart TD
 
 ## 📚 Documentation
 
-- [🛣 Project Planning Document](/docs/project-plan.md)
-- [🔌 API Integration Guide](/docs/api.md)
+- [📖 User Stories](docs/user_stories.md)
+- [🏗 System Architecture](docs/system_architecture.md)
+- [🛣 Project Plan](docs/project-plan.md)
 
 ---
 
