@@ -215,3 +215,49 @@ We welcome contributions from developers of all skill levels. To contribute:
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+## 🐞 Troubleshooting
+
+### MongoDB Connection Error
+- Ensure MongoDB is running locally (`mongod`) or that your connection string from MongoDB Atlas is correctly configured in `.env`.
+- Use the following to test your connection:
+```bash
+mongo <your-database-uri>
+```
+- Make sure your IP address is added to the Atlas access list if using Atlas.
+
+### Backend Not Starting
+- Confirm `.env` is present and contains valid values.
+- Check if ports (e.g., 3001) are already in use.
+
+### CORS or Network Errors
+- Make sure your backend includes CORS middleware:
+```js
+const cors = require("cors");
+app.use(cors());
+```
+
+---
+
+## 🗃 Local Database Setup (MongoDB)
+
+To use MongoDB locally:
+
+1. **Install MongoDB Community Edition**  
+   👉 [https://www.mongodb.com/try/download/community](https://www.mongodb.com/try/download/community)
+
+2. **Start MongoDB**  
+   Run in terminal:
+   ```bash
+   mongod
+   ```
+
+3. **Update your `.env`**:
+   ```
+   MONGO_URI=mongodb://localhost:27017/japan-travel-planner
+   ```
+
+4. **Connect using MongoDB Compass** (optional GUI)  
+   👉 [https://www.mongodb.com/products/compass](https://www.mongodb.com/products/compass)
+
+---

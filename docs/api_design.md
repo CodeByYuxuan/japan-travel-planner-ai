@@ -1,6 +1,6 @@
 # 🔌 API Design – Japan Travel Planner AI
 
-This document outlines the key backend endpoints.
+This document outlines the backend API endpoints for itinerary generation, saving, and retrieval.
 
 ---
 
@@ -14,11 +14,10 @@ This document outlines the key backend endpoints.
 
 ## 📤 Endpoints
 
-### POST /api/itinerary
+### POST `/api/itinerary`
 
-- Description: Generate a trip itinerary using OpenAI
-- Request Body:
-
+- **Description**: Generate a trip itinerary using OpenAI.
+- **Request Body**:
 ```json
 {
   "destination": "Tokyo",
@@ -27,16 +26,23 @@ This document outlines the key backend endpoints.
   "interests": ["food", "culture"]
 }
 ```
-
-- Response: Raw itinerary (text or JSON)
+- **Success Response** (`200 OK`):
+```json
+{
+  "status": "success",
+  "itinerary": { "day1": [...], "day2": [...] }
+}
+```
+- **Error Responses**:
+  - `400 Bad Request`: Missing or invalid fields.
+  - `500 Internal Server Error`: OpenAI API failure or timeout.
 
 ---
 
-### POST /api/save
+### POST `/api/save`
 
-- Description: Save itinerary to database
-- Request Body:
-
+- **Description**: Save a generated itinerary to the database.
+- **Request Body**:
 ```json
 {
   "userId": "123abc",
@@ -48,9 +54,42 @@ This document outlines the key backend endpoints.
   "enriched": {}
 }
 ```
+- **Success Response** (`201 Created`):
+```json
+{
+  "status": "success",
+  "itineraryId": "65f9478fabc12345"
+}
+```
+- **Error Responses**:
+  - `400 Bad Request`: Incomplete or malformed request body.
+  - `500 Internal Server Error`: Database failure.
 
 ---
 
-### GET /api/itinerary/:id
+### GET `/api/itinerary/:id`
 
-- Description: Retrieve saved itinerary by ID
+- **Description**: Retrieve a saved itinerary by its unique ID.
+- **Success Response** (`200 OK`):
+```json
+{
+  "status": "success",
+  "itinerary": {
+    "destination": "Tokyo",
+    "days": 5,
+    "aiResponse": { "day1": [...], ... },
+    "enriched": { "weather": {}, "accommodations": {} }
+  }
+}
+```
+- **Error Responses**:
+  - `404 Not Found`: No itinerary exists for the given ID.
+  - `500 Internal Server Error`: Database query failure.
+
+---
+
+## 📘 Notes
+
+- All responses follow a consistent format for easier frontend handling.
+- Error responses should include meaningful messages for debugging and user feedback.
+- Consider logging all `500` errors with internal stack traces (not exposed to users).
