@@ -1,0 +1,28 @@
+# Node
+node_modules/
+.env
+dist/
+build/
+.DS_Store
+
+# React (web)
+client-web/.env
+client-web/node_modules/
+client-web/dist/
+
+# Expo (mobile)
+client-mobile/.expo/
+client-mobile/.expo-shared/
+client-mobile/node_modules/
+client-mobile/.env
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
