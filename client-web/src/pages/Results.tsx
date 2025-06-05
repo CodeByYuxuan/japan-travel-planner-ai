@@ -1,11 +1,20 @@
-// Results page placeholder
-import React from 'react';
+import React, { useEffect, useState } from "react";
 
-const Results = () => {
+const Results: React.FC = () => {
+  const [itinerary, setItinerary] = useState("");
+
+  useEffect(() => {
+    const storedItinerary = localStorage.getItem("itinerary");
+    if (storedItinerary) {
+      const data = JSON.parse(storedItinerary);
+      setItinerary(data.itinerary);
+    }
+  }, []);
+
   return (
     <div>
-      <h2>Itinerary Results</h2>
-      <p>Results will appear here.</p>
+      <h2>Your Generated Itinerary</h2>
+      <pre>{itinerary}</pre>
     </div>
   );
 };
