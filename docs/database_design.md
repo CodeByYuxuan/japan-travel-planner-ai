@@ -1,18 +1,18 @@
-# 🗃 Database Design – Japan Travel Planner AI
+# Database Design – Japan Travel Planner AI
 
 This document outlines the MongoDB schema structure used for the MVP. MongoDB was selected due to its flexible document-based format, which is ideal for storing varied and AI-generated data structures.
 
 ---
 
-## 📌 Why MongoDB?
+## Why MongoDB?
 
-- Schemaless design is great for rapid iteration.
+- The schemaless design supports fast prototyping and future changes without friction.
 - Supports storing nested, semi-structured AI responses.
 - Works well with Mongoose for schema enforcement and querying.
 
 ---
 
-## 👤 User Schema
+## User Schema
 
 ```javascript
 const UserSchema = new mongoose.Schema({
@@ -21,17 +21,18 @@ const UserSchema = new mongoose.Schema({
 });
 ```
 
-**📝 Notes:**
+**Notes:**
+
 - `email` is required and unique to allow for future login/share features.
 - `createdAt` helps track user registration or guest session timing.
 
 ---
 
-## 📅 Itinerary Schema
+## Itinerary Schema
 
 ```javascript
 const ItinerarySchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   destination: { type: String, required: true },
   startDate: { type: Date, required: true },
   days: { type: Number, required: true, min: 1 },
@@ -40,21 +41,22 @@ const ItinerarySchema = new mongoose.Schema({
   enriched: {
     weather: { type: Object },
     accommodations: { type: Object },
-    maps: { type: Object }
+    maps: { type: Object },
   },
   createdAt: { type: Date, default: Date.now },
 });
 ```
 
-**📝 Notes:**
+**Notes:**
+
 - `preferences` allows for rich customization like ["culture", "food"].
-- `aiResponse` is kept as `Mixed` for flexibility — usually a string or parsed JSON from OpenAI.
+- `aiResponse` is kept as `Mixed` to accept either stringified JSON or structured objects returned by OpenAI.
 - `enriched` captures the enhanced details like weather and map data, and is structured for optional usage by the frontend.
-- `createdAt` lets users view or manage their saved trips chronologically.
+- `createdAt` lets users browse, sort, or manage itineraries by date.
 
 ---
 
-## 🔄 Usage Example
+## Usage Example
 
 ```json
 {
@@ -74,8 +76,8 @@ const ItinerarySchema = new mongoose.Schema({
 
 ---
 
-## ✅ Validation & Maintenance Notes
+## Validation & Maintenance Notes
 
-- Use [Joi](https://joi.dev/) or Mongoose validation for robust request validation.
-- Index `userId`, `destination`, and `createdAt` for faster queries.
-- Consider archiving `aiResponse` and `enriched` for large payloads.
+- Use Joi or Mongoose built-in validation to keep incoming requests safe and predictable.
+- Add indexes on `userId`, `destination`, and `createdAt` for faster lookups and reporting.
+- For long-term scale, consider archiving or compressing the `aiResponse` and `enriched` fields if payloads grow large.

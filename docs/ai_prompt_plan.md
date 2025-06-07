@@ -1,12 +1,12 @@
-# 🤖 AI Prompt Plan – Japan Travel Planner AI
+# AI Prompt Plan – Japan Travel Planner AI
 
-This document defines the strategy for using OpenAI's GPT model to generate structured, multi-day travel itineraries.
+This document defines the strategy for using OpenAI's GPT model to generate structured, multi-day travel itineraries. The aim is to ensure results are predictable, relevant, and easily integrated into the application.
 
 ---
 
-## 🧠 Prompt Template
+## Prompt Template
 
-Ask the AI to generate a structured JSON itinerary:
+The system sends a structured prompt to the AI, requesting a detailed itinerary formatted in JSON:
 
 ```
 Generate a detailed itinerary for a {days}-day trip to {destination} starting from {startDate}.
@@ -16,7 +16,7 @@ Please format the response as JSON with a day-by-day breakdown, and include time
 
 ---
 
-## 💡 Example Prompt
+## Example Prompt
 
 ```
 Generate a detailed itinerary for a 5-day trip to Tokyo starting from 2025-05-01.
@@ -47,9 +47,10 @@ Please provide a JSON response like:
 
 ---
 
-## 📄 Output Format
+## Output Format
 
 - **Required structure**:
+
 ```json
 {
   "day1": [ { "time": "Morning", "activity": "Name", "details": "..." } ],
@@ -62,23 +63,21 @@ Please provide a JSON response like:
 
 ---
 
-## 🔧 Prompt Fields
+## Prompt Fields
 
-| Field       | Type     | Description                                    |
-|-------------|----------|------------------------------------------------|
-| destination | String   | City or region in Japan                        |
-| days        | Integer  | Number of days for the trip                    |
-| startDate   | Date     | Optional – improves accuracy for weather APIs |
-| interests   | String[] | Travel themes (e.g., "food", "culture")       |
+| Field       | Type      | Description                                   |
+| ----------- | --------- | --------------------------------------------- |
+| destination | String    | City or region in Japan                       |
+| days        | Integer   | Number of days for the trip                   |
+| startDate   | Date      | Optional – improves accuracy for weather APIs |
+| interests   | String\[] | Travel themes (e.g., "food", "culture")       |
 
 ---
 
-## ✅ Integration Tips
+## Integration Tips
 
 - Use this prompt from backend (Node.js) with OpenAI’s `chat.completions` endpoint.
 - Set the `temperature` parameter between 0.7–0.9 for varied but coherent results.
 - Validate returned JSON using `try/catch` in backend before sending to frontend.
-- If the AI fails to format output, prompt again with:  
+- If the AI fails to format output, prompt again with:
   _“Please reformat the previous itinerary in valid JSON.”_
-
----

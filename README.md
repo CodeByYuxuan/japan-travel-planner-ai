@@ -172,9 +172,8 @@ flowchart TD
 
 ## Documentation
 
-- [User Stories](docs/user_stories.md)
+- [User Story](docs/user_story.md)
 - [System Architecture](docs/system_architecture.md)
-- [Project Plan](docs/project-plan.md)
 
 ---
 
