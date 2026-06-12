@@ -1,0 +1,15 @@
+{
+  "name": "japan-travel-planner-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @japan-travel-planner/web --filter @japan-travel-planner/api dev",
+    "dev:web": "pnpm --filter @japan-travel-planner/web dev",
+    "dev:api": "pnpm --filter @japan-travel-planner/api dev",
+    "build": "pnpm --filter @japan-travel-planner/shared build && pnpm --filter @japan-travel-planner/api build && pnpm --filter @japan-travel-planner/web build",
+    "typecheck": "pnpm --filter @japan-travel-planner/shared typecheck && pnpm --filter @japan-travel-planner/api typecheck && pnpm --filter @japan-travel-planner/web typecheck",
+    "test": "pnpm --filter @japan-travel-planner/shared test && pnpm --filter @japan-travel-planner/api test && pnpm --filter @japan-travel-planner/web test"
+  }
+}
