@@ -56,19 +56,19 @@ Features such as live transit routing, hotel search, LINE sharing, PDF export, o
 
 ## Proposed Tech Stack
 
-| Area | Proposed Tools |
-| --- | --- |
-| Web app | React, TypeScript, Vite |
-| Mobile app | React Native, Expo |
-| Backend API | Node.js, TypeScript, Express |
-| Database | PostgreSQL with Prisma, or MongoDB if document-first storage is preferred |
-| AI | OpenAI API |
-| Maps and routes | Google Maps Platform |
-| Weather | JMA or OpenWeather |
-| Hotels | Rakuten Travel API or another accommodation provider |
-| Testing | Vitest, React Testing Library, Supertest, Playwright |
-| CI/CD | GitHub Actions |
-| Hosting | Vercel or Netlify for web, Render/Railway/Fly.io/GCP for API, managed database |
+| Area            | Proposed Tools                                                                 |
+| --------------- | ------------------------------------------------------------------------------ |
+| Web app         | React, TypeScript, Vite                                                        |
+| Mobile app      | React Native, Expo                                                             |
+| Backend API     | Node.js, TypeScript, Express                                                   |
+| Database        | PostgreSQL with Prisma, or MongoDB if document-first storage is preferred      |
+| AI              | OpenAI API                                                                     |
+| Maps and routes | Google Maps Platform                                                           |
+| Weather         | JMA or OpenWeather                                                             |
+| Hotels          | Rakuten Travel API or another accommodation provider                           |
+| Testing         | Vitest, React Testing Library, Supertest, Playwright                           |
+| CI/CD           | GitHub Actions                                                                 |
+| Hosting         | Vercel or Netlify for web, Render/Railway/Fly.io/GCP for API, managed database |
 
 ## Proposed Repository Structure
 
