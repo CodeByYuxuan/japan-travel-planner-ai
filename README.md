@@ -6,9 +6,9 @@ This repository is being rebuilt from an older project README. The original visi
 
 ## Current Status
 
-Project phase: planning and rebuild.
+Project phase: scaffolded rebuild.
 
-The current repository starts with documentation only. Implementation work should begin with the web MVP and backend API described in [docs/development_plan.md](docs/development_plan.md).
+The current repository contains a minimal TypeScript monorepo skeleton with placeholder web, API, shared, and config packages. Feature work should continue with the web MVP and backend API described in [docs/development_plan.md](docs/development_plan.md).
 
 ## Product Goals
 
@@ -99,13 +99,27 @@ WEB_ORIGIN=http://localhost:5173
 API_PORT=3001
 ```
 
-## Planned Local Development
+## Local Development
 
-These commands represent the intended developer workflow after the monorepo is scaffolded:
+Install dependencies:
 
 ```bash
 pnpm install
+```
+
+Run both local app shells:
+
+```bash
 pnpm dev
+```
+
+Run quality checks:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
 Target app URLs:
@@ -153,7 +167,7 @@ flowchart TD
 
 ## License
 
-MIT License. Add a `LICENSE` file before public release.
+MIT License. See [LICENSE](LICENSE).
 
 ## Developer
 
