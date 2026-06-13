@@ -4,10 +4,13 @@ import { describe, expect, test } from "vitest";
 import { App } from "./App";
 
 describe("App", () => {
-  test("renders the project shell", () => {
+  test("renders the responsive web MVP shell", () => {
     const html = renderToString(<App />);
 
-    expect(html).toContain("Japan Travel Planner AI");
-    expect(html).toContain("web MVP shell");
+    expect(html).toContain("Japan Travel Planner");
+    expect(html).toContain("Japan trip workspace");
+    expect(html).toContain("No trip selected");
+    expect(html).toContain("React + Vite");
+    expect(html).toContain("localhost:5173");
   });
 });
