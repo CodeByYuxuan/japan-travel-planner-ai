@@ -2,8 +2,11 @@ import "./App.css";
 
 import { useState } from "react";
 
-import type { Itinerary } from "../../../packages/shared/src/schemas/itinerary.js";
 import { ItineraryView } from "./features/itinerary/ItineraryView.js";
+import {
+  cloneItinerary,
+  useItineraryEditor
+} from "./features/itinerary/editing/useItineraryEditor.js";
 import { TripIntakeForm } from "./features/trip-intake/index.js";
 import { mockItinerary } from "./mocks/index.js";
 
@@ -12,8 +15,9 @@ const navigationItems = ["Planner", "Trips", "Account"];
 const mockSubmitDelayMs = 500;
 
 export function App() {
-  const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const itineraryEditor = useItineraryEditor(null);
+  const itinerary = itineraryEditor.itinerary;
 
   const workspacePanels = [
     {
@@ -23,7 +27,11 @@ export function App() {
     },
     {
       title: "Itinerary board",
-      status: itinerary ? "Preview ready" : "Waiting",
+      status: itineraryEditor.isDirty
+        ? "Local edits"
+        : itinerary
+          ? "Preview ready"
+          : "Waiting",
       detail: "Daily activities, timing, locations, cost levels, and notes"
     },
     {
@@ -35,10 +43,10 @@ export function App() {
 
   function handleMockSubmit() {
     setIsSubmitting(true);
-    setItinerary(null);
+    itineraryEditor.resetItinerary(null);
 
     setTimeout(() => {
-      setItinerary(mockItinerary);
+      itineraryEditor.resetItinerary(cloneItinerary(mockItinerary));
       setIsSubmitting(false);
     }, mockSubmitDelayMs);
   }
@@ -92,7 +100,13 @@ export function App() {
             <div>
               <dt>Mode</dt>
               <dd>
-                {isSubmitting ? "Loading" : itinerary ? "Preview" : "Input"}
+                {isSubmitting
+                  ? "Loading"
+                  : itineraryEditor.isDirty
+                    ? "Editing"
+                    : itinerary
+                      ? "Preview"
+                      : "Input"}
               </dd>
             </div>
           </dl>
@@ -113,7 +127,17 @@ export function App() {
             isSubmitting={isSubmitting}
             onMockSubmit={handleMockSubmit}
           />
-          <ItineraryView itinerary={itinerary} isLoading={isSubmitting} />
+          <ItineraryView
+            editing={{
+              isDirty: itineraryEditor.isDirty,
+              onAddActivity: itineraryEditor.addActivity,
+              onDeleteActivity: itineraryEditor.deleteActivity,
+              onMoveActivity: itineraryEditor.moveActivity,
+              onUpdateActivity: itineraryEditor.updateActivity
+            }}
+            itinerary={itinerary}
+            isLoading={isSubmitting}
+          />
         </section>
       </main>
     </div>

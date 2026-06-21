@@ -3,6 +3,8 @@ import type {
   ActivityCategory,
   ActivityCostLevel
 } from "../../../../../packages/shared/src/schemas/itinerary.js";
+import { ReorderControls } from "./editing/ReorderControls.js";
+import type { ReorderDirection } from "./editing/useItineraryEditor.js";
 
 const categoryLabels: Record<ActivityCategory, string> = {
   sightseeing: "Sightseeing",
@@ -45,9 +47,19 @@ function formatTiming(activity: Activity) {
 
 export type ActivityCardProps = {
   activity: Activity;
+  editingControls?: {
+    canDelete: boolean;
+    onDelete: () => void;
+    onEdit: () => void;
+    reorder: {
+      canMoveDown: boolean;
+      canMoveUp: boolean;
+      onMove: (direction: ReorderDirection) => void;
+    };
+  } | undefined;
 };
 
-export function ActivityCard({ activity }: ActivityCardProps) {
+export function ActivityCard({ activity, editingControls }: ActivityCardProps) {
   const locationDetail =
     activity.location.address ??
     activity.location.city ??
@@ -94,6 +106,32 @@ export function ActivityCard({ activity }: ActivityCardProps) {
         >
           Open map
         </a>
+      ) : null}
+
+      {editingControls ? (
+        <div className="activity-card-actions">
+          <button
+            aria-label={`Edit ${activity.title}`}
+            onClick={editingControls.onEdit}
+            type="button"
+          >
+            Edit
+          </button>
+          <button
+            aria-label={`Delete ${activity.title}`}
+            disabled={!editingControls.canDelete}
+            onClick={editingControls.onDelete}
+            type="button"
+          >
+            Delete
+          </button>
+          <ReorderControls
+            activityTitle={activity.title}
+            canMoveDown={editingControls.reorder.canMoveDown}
+            canMoveUp={editingControls.reorder.canMoveUp}
+            onMove={editingControls.reorder.onMove}
+          />
+        </div>
       ) : null}
     </article>
   );
