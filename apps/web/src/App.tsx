@@ -1,29 +1,48 @@
 import "./App.css";
 
+import { useState } from "react";
+
+import type { Itinerary } from "../../../packages/shared/src/schemas/itinerary.js";
 import { ItineraryView } from "./features/itinerary/ItineraryView.js";
+import { TripIntakeForm } from "./features/trip-intake/index.js";
 import { mockItinerary } from "./mocks/index.js";
 
 const navigationItems = ["Planner", "Trips", "Account"];
 
-const workspacePanels = [
-  {
-    title: "Trip setup",
-    status: "Next ticket",
-    detail: "Dates, cities, pace, budget, and interests"
-  },
-  {
-    title: "Itinerary board",
-    status: "Preview ready",
-    detail: "Daily activities, timing, locations, cost levels, and notes"
-  },
-  {
-    title: "Travel context",
-    status: "Mock context",
-    detail: "Map links, weather, and local context"
-  }
-];
+const mockSubmitDelayMs = 500;
 
 export function App() {
+  const [itinerary, setItinerary] = useState<Itinerary | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const workspacePanels = [
+    {
+      title: "Trip setup",
+      status: isSubmitting ? "Submitting" : "Ready",
+      detail: "Dates, cities, pace, budget, and interests"
+    },
+    {
+      title: "Itinerary board",
+      status: itinerary ? "Preview ready" : "Waiting",
+      detail: "Daily activities, timing, locations, cost levels, and notes"
+    },
+    {
+      title: "Travel context",
+      status: "Mock context",
+      detail: "Map links, weather, and local context"
+    }
+  ];
+
+  function handleMockSubmit() {
+    setIsSubmitting(true);
+    setItinerary(null);
+
+    setTimeout(() => {
+      setItinerary(mockItinerary);
+      setIsSubmitting(false);
+    }, mockSubmitDelayMs);
+  }
+
   return (
     <div className="app-shell">
       <aside className="app-sidebar" aria-label="Workspace navigation">
@@ -54,25 +73,27 @@ export function App() {
         <section className="workspace-hero">
           <div>
             <p className="section-kicker">Web MVP Preview</p>
-            <h1 id="workspace-title">Japan trip itinerary</h1>
+            <h1 id="workspace-title">Japan trip planner</h1>
             <p className="workspace-state">
-              A balanced Tokyo and Kyoto spring route with temples, markets,
-              viewpoints, and easy walking windows.
+              Build a request from dates, cities, interests, pace, budget, and
+              constraints before previewing a structured mock itinerary.
             </p>
           </div>
 
           <dl className="shell-status" aria-label="Shell status">
             <div>
               <dt>Trip</dt>
-              <dd>{mockItinerary.title}</dd>
+              <dd>{itinerary?.title ?? "Not generated"}</dd>
             </div>
             <div>
               <dt>Days</dt>
-              <dd>{mockItinerary.days.length}</dd>
+              <dd>{itinerary?.days.length ?? 0}</dd>
             </div>
             <div>
               <dt>Mode</dt>
-              <dd>Preview</dd>
+              <dd>
+                {isSubmitting ? "Loading" : itinerary ? "Preview" : "Input"}
+              </dd>
             </div>
           </dl>
         </section>
@@ -87,7 +108,13 @@ export function App() {
           ))}
         </section>
 
-        <ItineraryView itinerary={mockItinerary} />
+        <section className="planner-workspace" aria-label="Trip planner">
+          <TripIntakeForm
+            isSubmitting={isSubmitting}
+            onMockSubmit={handleMockSubmit}
+          />
+          <ItineraryView itinerary={itinerary} isLoading={isSubmitting} />
+        </section>
       </main>
     </div>
   );

@@ -210,6 +210,109 @@ select {
   line-height: 1.6;
 }
 
+.planner-workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.trip-intake-form {
+  display: grid;
+  gap: 22px;
+  border: 1px solid #d8e0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 24px;
+}
+
+.trip-intake-header h2 {
+  margin: 10px 0;
+  color: #172026;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.trip-intake-header p:last-child {
+  margin: 0;
+  color: #52616d;
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.trip-intake-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-field {
+  display: grid;
+  gap: 7px;
+}
+
+.form-field-wide {
+  grid-column: 1 / -1;
+}
+
+.form-field label {
+  color: #172026;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cfd9df;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172026;
+  padding: 10px 11px;
+}
+
+.form-field textarea {
+  resize: vertical;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  border-color: #0d3b4f;
+  outline: 3px solid #dbecef;
+}
+
+.form-field [aria-invalid="true"] {
+  border-color: #be3f32;
+}
+
+.field-error {
+  margin: 0;
+  color: #be3f32;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.trip-intake-submit {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: #0d3b4f;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 12px 16px;
+}
+
+.trip-intake-submit:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .itinerary-view {
   display: grid;
   gap: 28px;
@@ -464,6 +567,7 @@ select {
 
   .workspace-hero,
   .workspace-grid,
+  .planner-workspace,
   .itinerary-summary,
   .activity-list {
     grid-template-columns: 1fr;
@@ -494,10 +598,15 @@ select {
 
   .workspace-hero,
   .workspace-panel,
+  .trip-intake-form,
   .itinerary-summary,
   .activity-card,
   .itinerary-state {
     padding: 20px;
+  }
+
+  .trip-intake-grid {
+    grid-template-columns: 1fr;
   }
 
   .workspace-hero h1 {
