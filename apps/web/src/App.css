@@ -210,6 +210,244 @@ select {
   line-height: 1.6;
 }
 
+.itinerary-view {
+  display: grid;
+  gap: 28px;
+}
+
+.itinerary-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  gap: 24px;
+  align-items: stretch;
+  border: 1px solid #d8e0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 28px;
+}
+
+.itinerary-summary h2,
+.itinerary-state h2 {
+  margin: 10px 0 10px;
+  color: #172026;
+  font-size: 1.7rem;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.itinerary-date-range {
+  margin: 0;
+  color: #52616d;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.itinerary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.itinerary-stats div {
+  border: 1px solid #dce4ea;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 14px;
+}
+
+.itinerary-stats dt {
+  color: #657480;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.itinerary-stats dd {
+  margin: 5px 0 0;
+  color: #172026;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.trip-day-list {
+  display: grid;
+  gap: 32px;
+}
+
+.trip-day-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.trip-day-heading {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-top: 1px solid #cfd9df;
+  padding-top: 22px;
+}
+
+.trip-day-heading h3 {
+  margin: 6px 0 0;
+  color: #172026;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.trip-day-heading span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #edf4f6;
+  color: #0d3b4f;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.trip-day-date,
+.trip-day-summary,
+.trip-day-weather {
+  margin: 0;
+}
+
+.trip-day-date {
+  color: #be3f32;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.trip-day-summary,
+.trip-day-weather {
+  max-width: 860px;
+  color: #52616d;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.trip-day-weather {
+  border-left: 3px solid #d94b3d;
+  padding-left: 12px;
+}
+
+.activity-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.activity-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #d8e0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.activity-card-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.activity-card h4 {
+  margin: 6px 0 0;
+  color: #172026;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.activity-time {
+  margin: 0;
+  color: #be3f32;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.activity-category {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #f2f6f8;
+  color: #52616d;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 5px 9px;
+}
+
+.activity-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.activity-meta div {
+  min-width: 0;
+}
+
+.activity-meta dt {
+  color: #657480;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.activity-meta dd {
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 0;
+  color: #172026;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.activity-meta small {
+  color: #657480;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.activity-notes {
+  margin: 0;
+  color: #52616d;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.activity-map-link {
+  width: max-content;
+  color: #0d3b4f;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.activity-map-link:hover {
+  text-decoration: underline;
+}
+
+.itinerary-state {
+  border: 1px solid #d8e0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 28px;
+}
+
+.itinerary-state p:last-child {
+  margin: 0;
+  color: #52616d;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
 @media (max-width: 820px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -225,12 +463,18 @@ select {
   }
 
   .workspace-hero,
-  .workspace-grid {
+  .workspace-grid,
+  .itinerary-summary,
+  .activity-list {
     grid-template-columns: 1fr;
   }
 
   .app-main {
     padding: 24px;
+  }
+
+  .activity-meta {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -249,11 +493,28 @@ select {
   }
 
   .workspace-hero,
-  .workspace-panel {
+  .workspace-panel,
+  .itinerary-summary,
+  .activity-card,
+  .itinerary-state {
     padding: 20px;
   }
 
   .workspace-hero h1 {
     font-size: 1.9rem;
+  }
+
+  .itinerary-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-day-heading,
+  .activity-card-header {
+    display: grid;
+  }
+
+  .trip-day-heading span,
+  .activity-category {
+    width: max-content;
   }
 }
