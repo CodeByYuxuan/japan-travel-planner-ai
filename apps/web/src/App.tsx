@@ -1,21 +1,24 @@
 import "./App.css";
 
+import { ItineraryView } from "./features/itinerary/ItineraryView.js";
+import { mockItinerary } from "./mocks/index.js";
+
 const navigationItems = ["Planner", "Trips", "Account"];
 
 const workspacePanels = [
   {
     title: "Trip setup",
-    status: "No trip selected",
+    status: "Next ticket",
     detail: "Dates, cities, pace, budget, and interests"
   },
   {
     title: "Itinerary board",
-    status: "Empty",
-    detail: "Daily activities and travel notes"
+    status: "Preview ready",
+    detail: "Daily activities, timing, locations, cost levels, and notes"
   },
   {
     title: "Travel context",
-    status: "Pending trip",
+    status: "Mock context",
     detail: "Map links, weather, and local context"
   }
 ];
@@ -50,23 +53,26 @@ export function App() {
       <main className="app-main" aria-labelledby="workspace-title">
         <section className="workspace-hero">
           <div>
-            <p className="section-kicker">Web MVP Shell</p>
-            <h1 id="workspace-title">Japan trip workspace</h1>
-            <p className="workspace-state">No trip selected</p>
+            <p className="section-kicker">Web MVP Preview</p>
+            <h1 id="workspace-title">Japan trip itinerary</h1>
+            <p className="workspace-state">
+              A balanced Tokyo and Kyoto spring route with temples, markets,
+              viewpoints, and easy walking windows.
+            </p>
           </div>
 
           <dl className="shell-status" aria-label="Shell status">
             <div>
-              <dt>Frontend</dt>
-              <dd>React + Vite</dd>
+              <dt>Trip</dt>
+              <dd>{mockItinerary.title}</dd>
             </div>
             <div>
-              <dt>Local URL</dt>
-              <dd>localhost:5173</dd>
+              <dt>Days</dt>
+              <dd>{mockItinerary.days.length}</dd>
             </div>
             <div>
-              <dt>Backend</dt>
-              <dd>Not required</dd>
+              <dt>Mode</dt>
+              <dd>Preview</dd>
             </div>
           </dl>
         </section>
@@ -80,6 +86,8 @@ export function App() {
             </article>
           ))}
         </section>
+
+        <ItineraryView itinerary={mockItinerary} />
       </main>
     </div>
   );
