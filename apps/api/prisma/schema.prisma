@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TravelPace {
+  relaxed
+  balanced
+  packed
+}
+
+enum TravelBudget {
+  budget
+  moderate
+  luxury
+}
+
+enum ActivityCategory {
+  sightseeing
+  food
+  culture
+  nature
+  shopping
+  transit
+  lodging
+  other
+}
+
+enum ActivityCostLevel {
+  free
+  low
+  medium
+  high
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  email              String?  @unique
+  displayName        String?
+  anonymousSessionId String?  @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  trips Trip[]
+}
+
+model Trip {
+  id          String       @id @default(cuid())
+  userId      String
+  title       String
+  cities      String[]
+  startDate   DateTime     @db.Date
+  endDate     DateTime     @db.Date
+  pace        TravelPace
+  budget      TravelBudget
+  interests   String[]
+  constraints String[]     @default([])
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  days       TripDay[]
+  shareLinks ShareLink[]
+
+  @@index([userId])
+  @@index([userId, startDate])
+}
+
+model TripDay {
+  id             String   @id @default(cuid())
+  tripId         String
+  date           DateTime @db.Date
+  city           String
+  summary        String?
+  orderIndex     Int
+  weatherSummary String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  trip       Trip       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@unique([tripId, date])
+  @@unique([tripId, orderIndex])
+  @@index([tripId])
+}
+
+model Activity {
+  id              String            @id @default(cuid())
+  tripDayId       String
+  title           String
+  category        ActivityCategory
+  startTime       String?
+  endTime         String?
+  timeOfDay       String?
+  durationMinutes Int
+  locationName    String
+  locationAddress String?
+  locationCity    String?
+  latitude        Float?
+  longitude       Float?
+  mapUrl          String?
+  costLevel       ActivityCostLevel
+  notes           String
+  orderIndex      Int
+  source          String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  tripDay TripDay @relation(fields: [tripDayId], references: [id], onDelete: Cascade)
+
+  @@unique([tripDayId, orderIndex])
+  @@index([tripDayId])
+  @@index([category])
+}
+
+model ShareLink {
+  id         String    @id @default(cuid())
+  tripId     String
+  token      String    @unique
+  permission String    @default("read_only")
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+}
