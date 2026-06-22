@@ -8,6 +8,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/build/**",
       "**/coverage/**",
+      "**/src/generated/**",
       "**/node_modules/**",
       "**/playwright-report/**",
       "**/test-results/**"

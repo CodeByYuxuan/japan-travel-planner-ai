@@ -113,6 +113,15 @@ Run both local app shells:
 pnpm dev
 ```
 
+Set up the local database after PostgreSQL is available:
+
+```bash
+cp .env.example .env
+pnpm --filter @japan-travel-planner/api db:generate
+pnpm --filter @japan-travel-planner/api db:migrate
+pnpm --filter @japan-travel-planner/api db:seed
+```
+
 Run quality checks:
 
 ```bash
