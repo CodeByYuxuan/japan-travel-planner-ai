@@ -1,16 +1,24 @@
+import cors from "cors";
 import express from "express";
 
-export function createApp() {
+import { loadApiEnv, type ApiEnvConfig } from "./config/env.js";
+import { healthRouter } from "./routes/health.js";
+
+export type CreateAppOptions = {
+  env?: ApiEnvConfig;
+};
+
+export function createApp(options: CreateAppOptions = {}) {
+  const env = options.env ?? loadApiEnv();
   const app = express();
 
+  app.use(
+    cors({
+      origin: env.webOrigin
+    })
+  );
   app.use(express.json());
-
-  app.get("/api/health", (_request, response) => {
-    response.status(200).json({
-      status: "ok",
-      service: "japan-travel-planner-api"
-    });
-  });
+  app.use("/api/health", healthRouter);
 
   return app;
 }
