@@ -11,11 +11,13 @@ describe("loadApiEnv", () => {
     expect(
       loadApiEnv({
         API_PORT: "4001",
-        WEB_ORIGIN: "https://planner.example.com"
+        WEB_ORIGIN: "https://planner.example.com",
+        JWT_SECRET: "test-session-secret-value"
       })
     ).toEqual({
       apiPort: 4001,
-      webOrigin: "https://planner.example.com"
+      webOrigin: "https://planner.example.com",
+      jwtSecret: "test-session-secret-value"
     });
   });
 
@@ -35,5 +37,21 @@ describe("loadApiEnv", () => {
         WEB_ORIGIN: "localhost:5173"
       })
     ).toThrow("Invalid WEB_ORIGIN");
+  });
+
+  test("fails clearly for too-short JWT_SECRET", () => {
+    expect(() =>
+      loadApiEnv({
+        JWT_SECRET: "short"
+      })
+    ).toThrow("Invalid JWT_SECRET");
+  });
+
+  test("fails clearly when JWT_SECRET is missing in production", () => {
+    expect(() =>
+      loadApiEnv({
+        NODE_ENV: "production"
+      })
+    ).toThrow("Invalid JWT_SECRET");
   });
 });
