@@ -1,16 +1,22 @@
 export type ApiEnvConfig = {
   apiPort: number;
   webOrigin: string;
+  jwtSecret: string;
 };
+
+const localDevelopmentJwtSecret = "local-development-session-secret-change-me";
 
 export const defaultApiEnv = {
   apiPort: 3001,
-  webOrigin: "http://localhost:5173"
+  webOrigin: "http://localhost:5173",
+  jwtSecret: localDevelopmentJwtSecret
 } satisfies ApiEnvConfig;
 
 type ApiEnvSource = {
   API_PORT?: string | undefined;
   WEB_ORIGIN?: string | undefined;
+  JWT_SECRET?: string | undefined;
+  NODE_ENV?: string | undefined;
 };
 
 function parseApiPort(value: string | undefined) {
@@ -49,9 +55,31 @@ function parseWebOrigin(value: string | undefined) {
   }
 }
 
+function parseJwtSecret(
+  value: string | undefined,
+  nodeEnv: string | undefined
+) {
+  const rawSecret = value?.trim();
+
+  if (rawSecret !== undefined && rawSecret.length > 0) {
+    if (rawSecret.length < 16) {
+      throw new Error("Invalid JWT_SECRET: expected at least 16 characters.");
+    }
+
+    return rawSecret;
+  }
+
+  if (nodeEnv === "production") {
+    throw new Error("Invalid JWT_SECRET: required when NODE_ENV=production.");
+  }
+
+  return defaultApiEnv.jwtSecret;
+}
+
 export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
   return {
     apiPort: parseApiPort(env.API_PORT),
-    webOrigin: parseWebOrigin(env.WEB_ORIGIN)
+    webOrigin: parseWebOrigin(env.WEB_ORIGIN),
+    jwtSecret: parseJwtSecret(env.JWT_SECRET, env.NODE_ENV)
   };
 }

@@ -2,6 +2,7 @@ import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 
 import { ApiError } from "../errors/ApiError.js";
+import { requireAnonymousSession } from "../middleware/session.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import type {
   CreateTripInput,
@@ -145,8 +146,9 @@ export function createTripsRouter(tripService: TripService) {
 
   router.get(
     "/",
-    asyncHandler(async (_request, response) => {
-      const trips = await tripService.listTrips();
+    asyncHandler(async (request, response) => {
+      const session = requireAnonymousSession(request);
+      const trips = await tripService.listTrips(session.id);
 
       response.status(200).json({ trips });
     })
@@ -156,7 +158,9 @@ export function createTripsRouter(tripService: TripService) {
     "/",
     validateRequest(tripCreateBodySchema),
     asyncHandler(async (request, response) => {
+      const session = requireAnonymousSession(request);
       const trip = await tripService.createTrip(
+        session.id,
         request.body as CreateTripInput
       );
 
@@ -167,7 +171,11 @@ export function createTripsRouter(tripService: TripService) {
   router.get(
     "/:tripId",
     asyncHandler(async (request, response) => {
-      const trip = await tripService.getTrip(getTripId(request.params.tripId));
+      const session = requireAnonymousSession(request);
+      const trip = await tripService.getTrip(
+        session.id,
+        getTripId(request.params.tripId)
+      );
 
       response.status(200).json({ trip });
     })
@@ -177,7 +185,9 @@ export function createTripsRouter(tripService: TripService) {
     "/:tripId",
     validateRequest(tripUpdateBodySchema),
     asyncHandler(async (request, response) => {
+      const session = requireAnonymousSession(request);
       const trip = await tripService.updateTrip(
+        session.id,
         getTripId(request.params.tripId),
         request.body as UpdateTripInput
       );
@@ -189,7 +199,12 @@ export function createTripsRouter(tripService: TripService) {
   router.delete(
     "/:tripId",
     asyncHandler(async (request, response) => {
-      await tripService.deleteTrip(getTripId(request.params.tripId));
+      const session = requireAnonymousSession(request);
+
+      await tripService.deleteTrip(
+        session.id,
+        getTripId(request.params.tripId)
+      );
 
       response.status(204).send();
     })

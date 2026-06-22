@@ -1,9 +1,10 @@
-import request from "supertest";
+import request, { type Response } from "supertest";
 import { describe, expect, test } from "vitest";
 
 import { apiErrorSchema } from "../../../../packages/shared/src/schemas/apiError.js";
 
 import { createApp } from "../app.js";
+import { anonymousSessionCookieName } from "../auth/sessionCookie.js";
 import { defaultApiEnv } from "../config/env.js";
 import type {
   CreateTripInput,
@@ -56,16 +57,55 @@ const validCreateTripPayload = {
   ]
 } satisfies CreateTripInput;
 
+function getSetCookieHeaders(response: Response) {
+  const setCookie = response.headers["set-cookie"];
+
+  if (Array.isArray(setCookie)) {
+    return setCookie;
+  }
+
+  if (typeof setCookie === "string") {
+    return [setCookie];
+  }
+
+  return [];
+}
+
+function expectAnonymousSessionCookie(response: Response) {
+  const sessionCookie = getSetCookieHeaders(response).find((cookie) =>
+    cookie.startsWith(`${anonymousSessionCookieName}=`)
+  );
+
+  expect(sessionCookie).toBeDefined();
+  expect(sessionCookie).toContain("HttpOnly");
+  expect(sessionCookie).toContain("SameSite=Lax");
+
+  return sessionCookie;
+}
+
 class InMemoryTripRepository implements TripRepository {
-  private readonly owner: TripOwner = { id: "test-owner" };
+  private readonly owners = new Map<string, TripOwner>();
   private readonly tripOwners = new Map<string, string>();
   private readonly trips = new Map<string, TripResponse>();
+  private nextOwnerId = 1;
   private nextTripId = 1;
   private nextDayId = 1;
   private nextActivityId = 1;
 
-  async findOrCreateOwner() {
-    return this.owner;
+  async findOrCreateOwner(anonymousSessionId: string) {
+    const existingOwner = this.owners.get(anonymousSessionId);
+
+    if (existingOwner !== undefined) {
+      return existingOwner;
+    }
+
+    const owner = {
+      id: `owner-${this.nextOwnerId++}`
+    };
+
+    this.owners.set(anonymousSessionId, owner);
+
+    return owner;
   }
 
   async listTrips(ownerId: string) {
@@ -169,7 +209,7 @@ function expectSharedErrorResponse(responseBody: unknown) {
 }
 
 describe("Trip CRUD API", () => {
-  test("GET /api/trips lists trips for the placeholder owner", async () => {
+  test("GET /api/trips lists trips for the current anonymous session", async () => {
     const app = createTripsTestApp();
 
     const response = await request(app).get("/api/trips");
@@ -178,6 +218,71 @@ describe("Trip CRUD API", () => {
     expect(response.body).toEqual({
       trips: []
     });
+  });
+
+  test("POST /api/trips without a session creates an HTTP-only anonymous session cookie", async () => {
+    const app = createTripsTestApp();
+
+    const response = await request(app)
+      .post("/api/trips")
+      .send(validCreateTripPayload);
+
+    expect(response.status).toBe(201);
+    expectAnonymousSessionCookie(response);
+  });
+
+  test("subsequent requests with the same cookie reuse the same owner session", async () => {
+    const app = createTripsTestApp();
+    const traveler = request.agent(app);
+
+    const createResponse = await traveler
+      .post("/api/trips")
+      .send(validCreateTripPayload);
+    const listResponse = await traveler.get("/api/trips");
+
+    expect(createResponse.status).toBe(201);
+    expectAnonymousSessionCookie(createResponse);
+    expect(listResponse.status).toBe(200);
+    expect(getSetCookieHeaders(listResponse)).toEqual([]);
+    expect(listResponse.body.trips).toEqual([
+      expect.objectContaining({
+        id: createResponse.body.trip.id,
+        title: validCreateTripPayload.title
+      })
+    ]);
+  });
+
+  test("GET /api/trips only lists trips for the current anonymous session", async () => {
+    const app = createTripsTestApp();
+    const travelerA = request.agent(app);
+    const travelerB = request.agent(app);
+
+    const createAResponse = await travelerA
+      .post("/api/trips")
+      .send(validCreateTripPayload);
+    const createBResponse = await travelerB.post("/api/trips").send({
+      ...validCreateTripPayload,
+      title: "Kyoto Garden Weekend",
+      cities: ["Kyoto"]
+    });
+
+    const listAResponse = await travelerA.get("/api/trips");
+    const listBResponse = await travelerB.get("/api/trips");
+
+    expect(createAResponse.status).toBe(201);
+    expect(createBResponse.status).toBe(201);
+    expect(listAResponse.body.trips).toEqual([
+      expect.objectContaining({
+        id: createAResponse.body.trip.id,
+        title: validCreateTripPayload.title
+      })
+    ]);
+    expect(listBResponse.body.trips).toEqual([
+      expect.objectContaining({
+        id: createBResponse.body.trip.id,
+        title: "Kyoto Garden Weekend"
+      })
+    ]);
   });
 
   test("POST /api/trips creates a trip with structured itinerary data", async () => {
@@ -242,11 +347,12 @@ describe("Trip CRUD API", () => {
 
   test("GET /api/trips/:tripId returns a trip", async () => {
     const app = createTripsTestApp();
-    const createResponse = await request(app)
+    const traveler = request.agent(app);
+    const createResponse = await traveler
       .post("/api/trips")
       .send(validCreateTripPayload);
 
-    const response = await request(app).get(
+    const response = await traveler.get(
       `/api/trips/${createResponse.body.trip.id}`
     );
 
@@ -274,11 +380,12 @@ describe("Trip CRUD API", () => {
 
   test("PATCH /api/trips/:tripId updates editable trip data", async () => {
     const app = createTripsTestApp();
-    const createResponse = await request(app)
+    const traveler = request.agent(app);
+    const createResponse = await traveler
       .post("/api/trips")
       .send(validCreateTripPayload);
 
-    const response = await request(app)
+    const response = await traveler
       .patch(`/api/trips/${createResponse.body.trip.id}`)
       .send({
         title: "Updated Spring Trip",
@@ -295,19 +402,45 @@ describe("Trip CRUD API", () => {
 
   test("DELETE /api/trips/:tripId hard-deletes a trip", async () => {
     const app = createTripsTestApp();
-    const createResponse = await request(app)
+    const traveler = request.agent(app);
+    const createResponse = await traveler
       .post("/api/trips")
       .send(validCreateTripPayload);
 
-    const deleteResponse = await request(app).delete(
+    const deleteResponse = await traveler.delete(
       `/api/trips/${createResponse.body.trip.id}`
     );
-    const getResponse = await request(app).get(
+    const getResponse = await traveler.get(
       `/api/trips/${createResponse.body.trip.id}`
     );
 
     expect(deleteResponse.status).toBe(204);
     expect(getResponse.status).toBe(404);
+  });
+
+  test("GET/PATCH/DELETE cannot access another anonymous session's trip", async () => {
+    const app = createTripsTestApp();
+    const owner = request.agent(app);
+    const otherTraveler = request.agent(app);
+    const createResponse = await owner
+      .post("/api/trips")
+      .send(validCreateTripPayload);
+    const tripId = createResponse.body.trip.id;
+
+    const getResponse = await otherTraveler.get(`/api/trips/${tripId}`);
+    const patchResponse = await otherTraveler
+      .patch(`/api/trips/${tripId}`)
+      .send({
+        title: "Cross-owner edit attempt"
+      });
+    const deleteResponse = await otherTraveler.delete(`/api/trips/${tripId}`);
+    const ownerGetResponse = await owner.get(`/api/trips/${tripId}`);
+
+    expect(getResponse.status).toBe(404);
+    expect(patchResponse.status).toBe(404);
+    expect(deleteResponse.status).toBe(404);
+    expect(ownerGetResponse.status).toBe(200);
+    expect(ownerGetResponse.body.trip.title).toBe(validCreateTripPayload.title);
   });
 
   test("GET /api/health still returns HTTP 200", async () => {
@@ -320,5 +453,6 @@ describe("Trip CRUD API", () => {
       status: "ok",
       service: "japan-travel-planner-api"
     });
+    expect(getSetCookieHeaders(response)).toEqual([]);
   });
 });

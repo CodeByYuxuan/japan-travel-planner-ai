@@ -6,33 +6,29 @@ import {
   type UpdateTripInput
 } from "../repositories/tripRepository.js";
 
-export const localAnonymousSessionId = "local-anonymous-traveler";
-
 export class TripService {
-  constructor(
-    private readonly repository: TripRepository,
-    private readonly anonymousSessionId = localAnonymousSessionId
-  ) {}
+  constructor(private readonly repository: TripRepository) {}
 
-  private async getOwnerId() {
-    const owner = await this.repository.findOrCreateOwner(
-      this.anonymousSessionId
-    );
+  private async getOwnerId(anonymousSessionId: string) {
+    const owner = await this.repository.findOrCreateOwner(anonymousSessionId);
 
     return owner.id;
   }
 
-  async listTrips() {
-    return this.repository.listTrips(await this.getOwnerId());
+  async listTrips(anonymousSessionId: string) {
+    return this.repository.listTrips(await this.getOwnerId(anonymousSessionId));
   }
 
-  async createTrip(input: CreateTripInput) {
-    return this.repository.createTrip(await this.getOwnerId(), input);
+  async createTrip(anonymousSessionId: string, input: CreateTripInput) {
+    return this.repository.createTrip(
+      await this.getOwnerId(anonymousSessionId),
+      input
+    );
   }
 
-  async getTrip(tripId: string) {
+  async getTrip(anonymousSessionId: string, tripId: string) {
     const trip = await this.repository.findTrip(
-      await this.getOwnerId(),
+      await this.getOwnerId(anonymousSessionId),
       tripId
     );
 
@@ -47,9 +43,13 @@ export class TripService {
     return trip;
   }
 
-  async updateTrip(tripId: string, input: UpdateTripInput) {
+  async updateTrip(
+    anonymousSessionId: string,
+    tripId: string,
+    input: UpdateTripInput
+  ) {
     const trip = await this.repository.updateTrip(
-      await this.getOwnerId(),
+      await this.getOwnerId(anonymousSessionId),
       tripId,
       input
     );
@@ -65,9 +65,9 @@ export class TripService {
     return trip;
   }
 
-  async deleteTrip(tripId: string) {
+  async deleteTrip(anonymousSessionId: string, tripId: string) {
     const deleted = await this.repository.deleteTrip(
-      await this.getOwnerId(),
+      await this.getOwnerId(anonymousSessionId),
       tripId
     );
 
