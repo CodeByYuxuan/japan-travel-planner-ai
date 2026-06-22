@@ -47,3 +47,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @japan-travel-planner/web exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm --filter @japan-travel-planner/web test:e2e
