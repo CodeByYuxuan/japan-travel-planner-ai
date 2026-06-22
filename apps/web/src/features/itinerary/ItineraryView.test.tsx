@@ -51,4 +51,26 @@ describe("ItineraryView", () => {
     expect(html).toContain("Preparing itinerary");
     expect(html).toContain('aria-busy="true"');
   });
+
+  test("renders local editing controls and dirty state", () => {
+    const html = renderToString(
+      <ItineraryView
+        editing={{
+          isDirty: true,
+          onAddActivity: () => undefined,
+          onDeleteActivity: () => undefined,
+          onMoveActivity: () => undefined,
+          onUpdateActivity: () => undefined
+        }}
+        itinerary={mockItinerary}
+      />
+    );
+
+    expect(html).toContain("Unsaved local edits");
+    expect(html).toContain("Add activity");
+    expect(html).toContain("Edit");
+    expect(html).toContain("Delete");
+    expect(html).toContain("Move Ameyoko lunch crawl up");
+    expect(html).toContain("Move Morning walk through Ueno Park down");
+  });
 });
