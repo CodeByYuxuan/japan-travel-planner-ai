@@ -15,7 +15,7 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    command: "pnpm dev",
+    command: "VITE_TRIP_DATA_MODE=mock pnpm dev",
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     url: "http://127.0.0.1:5173"

@@ -10,8 +10,11 @@ describe("App", () => {
     expect(html).toContain("Japan Travel Planner");
     expect(html).toContain("Japan trip planner");
     expect(html).toContain("Plan your Japan route");
-    expect(html).toContain("Generate mock itinerary");
+    expect(html).toContain("Create saved itinerary");
+    expect(html).toContain("Use mock preview");
+    expect(html).toContain("Save and reopen");
+    expect(html).toContain("Refresh saved trips");
     expect(html).toContain("No itinerary yet");
-    expect(html).toContain("Input");
+    expect(html).toContain("API");
   });
 });

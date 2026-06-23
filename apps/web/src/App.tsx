@@ -2,22 +2,49 @@ import "./App.css";
 
 import { useState } from "react";
 
+import type { TripRequest } from "../../../packages/shared/src/schemas/tripRequest.js";
 import { ItineraryView } from "./features/itinerary/ItineraryView.js";
 import {
   cloneItinerary,
   useItineraryEditor
 } from "./features/itinerary/editing/useItineraryEditor.js";
 import { TripIntakeForm } from "./features/trip-intake/index.js";
+import {
+  getDefaultTripDataMode,
+  useTrips,
+  type TripDataMode
+} from "./features/trips/useTrips.js";
 import { mockItinerary } from "./mocks/index.js";
 
 const navigationItems = ["Planner", "Trips", "Account"];
 
 const mockSubmitDelayMs = 500;
 
+function isApiBusy(status: ReturnType<typeof useTrips>["status"]) {
+  return (
+    status === "creating" ||
+    status === "loading" ||
+    status === "reopening" ||
+    status === "saving"
+  );
+}
+
 export function App() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeRequest, setActiveRequest] = useState<TripRequest | null>(null);
+  const [dataMode, setDataMode] = useState<TripDataMode>(
+    getDefaultTripDataMode
+  );
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [isMockSubmitting, setIsMockSubmitting] = useState(false);
   const itineraryEditor = useItineraryEditor(null);
   const itinerary = itineraryEditor.itinerary;
+  const trips = useTrips();
+  const apiBusy = isApiBusy(trips.status);
+  const isSubmitting =
+    isMockSubmitting ||
+    trips.status === "creating" ||
+    trips.status === "saving";
+  const storageMessage = localError ?? trips.errorMessage;
 
   const workspacePanels = [
     {
@@ -35,20 +62,107 @@ export function App() {
       detail: "Daily activities, timing, locations, cost levels, and notes"
     },
     {
-      title: "Travel context",
-      status: "Mock context",
-      detail: "Map links, weather, and local context"
+      title: "Trip storage",
+      status:
+        dataMode === "mock"
+          ? "Mock mode"
+          : trips.status === "saved"
+            ? "Saved"
+            : "API ready",
+      detail: "Anonymous session cookies, saved trips, and reopen controls"
     }
   ];
 
-  function handleMockSubmit() {
-    setIsSubmitting(true);
+  function resetToItinerary(nextItinerary: typeof itinerary) {
+    itineraryEditor.resetItinerary(
+      nextItinerary ? cloneItinerary(nextItinerary) : null
+    );
+  }
+
+  function handleMockSubmit(request: TripRequest) {
+    setActiveRequest(request);
+    setLocalError(null);
+    trips.clearError();
+    setIsMockSubmitting(true);
     itineraryEditor.resetItinerary(null);
 
     setTimeout(() => {
-      itineraryEditor.resetItinerary(cloneItinerary(mockItinerary));
-      setIsSubmitting(false);
+      resetToItinerary(mockItinerary);
+      setIsMockSubmitting(false);
     }, mockSubmitDelayMs);
+  }
+
+  async function handleTripSubmit(request: TripRequest) {
+    if (dataMode === "mock") {
+      handleMockSubmit(request);
+      return;
+    }
+
+    setActiveRequest(request);
+    setLocalError(null);
+    resetToItinerary(null);
+
+    const result = await trips.createTripFromRequest(
+      request,
+      cloneItinerary(mockItinerary)
+    );
+
+    if (result) {
+      setActiveRequest(result.request);
+      resetToItinerary(result.itinerary);
+    }
+  }
+
+  async function handleSaveItinerary() {
+    if (!itinerary) {
+      setLocalError("Create or reopen an itinerary before saving.");
+      return;
+    }
+
+    if (!activeRequest) {
+      setLocalError("Trip request details are required before saving.");
+      return;
+    }
+
+    setLocalError(null);
+
+    const result = await trips.saveTrip(
+      trips.selectedTripId,
+      activeRequest,
+      itinerary
+    );
+
+    if (result) {
+      setActiveRequest(result.request);
+      resetToItinerary(result.itinerary);
+    }
+  }
+
+  async function handleReopenTrip() {
+    if (!trips.selectedTripId) {
+      setLocalError("Select a saved trip to reopen.");
+      return;
+    }
+
+    setLocalError(null);
+
+    const result = await trips.reopenTrip(trips.selectedTripId);
+
+    if (result) {
+      setActiveRequest(result.request);
+      resetToItinerary(result.itinerary);
+    }
+  }
+
+  async function handleLoadSavedTrips() {
+    setLocalError(null);
+    await trips.loadSavedTrips();
+  }
+
+  function handleModeChange(nextMode: TripDataMode) {
+    setDataMode(nextMode);
+    setLocalError(null);
+    trips.clearError();
   }
 
   return (
@@ -84,7 +198,7 @@ export function App() {
             <h1 id="workspace-title">Japan trip planner</h1>
             <p className="workspace-state">
               Build a request from dates, cities, interests, pace, budget, and
-              constraints before previewing a structured mock itinerary.
+              constraints before saving or previewing a structured itinerary.
             </p>
           </div>
 
@@ -99,15 +213,7 @@ export function App() {
             </div>
             <div>
               <dt>Mode</dt>
-              <dd>
-                {isSubmitting
-                  ? "Loading"
-                  : itineraryEditor.isDirty
-                    ? "Editing"
-                    : itinerary
-                      ? "Preview"
-                      : "Input"}
-              </dd>
+              <dd>{dataMode === "api" ? "API" : "Mock"}</dd>
             </div>
           </dl>
         </section>
@@ -123,10 +229,115 @@ export function App() {
         </section>
 
         <section className="planner-workspace" aria-label="Trip planner">
-          <TripIntakeForm
-            isSubmitting={isSubmitting}
-            onMockSubmit={handleMockSubmit}
-          />
+          <div className="planner-sidebar-panel">
+            <TripIntakeForm
+              isSubmitting={isSubmitting}
+              onSubmitTrip={handleTripSubmit}
+              submitLabel={
+                dataMode === "api"
+                  ? "Create saved itinerary"
+                  : "Generate mock itinerary"
+              }
+              {...(dataMode === "api"
+                ? {
+                    mockSubmitLabel: "Use mock preview",
+                    onMockSubmit: handleMockSubmit
+                  }
+                : {})}
+            />
+
+            <section
+              aria-labelledby="trip-storage-title"
+              className="trip-storage-panel"
+            >
+              <header>
+                <p className="section-kicker">Trip storage</p>
+                <h2 id="trip-storage-title">Save and reopen</h2>
+              </header>
+
+              <div className="mode-toggle" aria-label="Trip data mode">
+                <button
+                  aria-pressed={dataMode === "api"}
+                  onClick={() => handleModeChange("api")}
+                  type="button"
+                >
+                  API
+                </button>
+                <button
+                  aria-pressed={dataMode === "mock"}
+                  onClick={() => handleModeChange("mock")}
+                  type="button"
+                >
+                  Mock
+                </button>
+              </div>
+
+              <p className="storage-status" role="status">
+                {apiBusy
+                  ? "Working"
+                  : trips.status === "saved"
+                    ? "Saved"
+                    : itineraryEditor.isDirty
+                      ? "Local edits pending"
+                      : dataMode === "mock"
+                        ? "Mock mode"
+                        : "Ready"}
+              </p>
+
+              {storageMessage ? (
+                <p className="storage-error" role="alert">
+                  {storageMessage}
+                </p>
+              ) : null}
+
+              <div className="storage-actions">
+                <button
+                  disabled={dataMode === "mock" || apiBusy || !itinerary}
+                  onClick={handleSaveItinerary}
+                  type="button"
+                >
+                  Save itinerary
+                </button>
+                <button
+                  disabled={dataMode === "mock" || apiBusy}
+                  onClick={handleLoadSavedTrips}
+                  type="button"
+                >
+                  Refresh saved trips
+                </button>
+              </div>
+
+              <label className="saved-trip-select">
+                Saved trips
+                <select
+                  disabled={dataMode === "mock" || apiBusy}
+                  onChange={(event) =>
+                    trips.selectTrip(event.currentTarget.value || null)
+                  }
+                  value={trips.selectedTripId ?? ""}
+                >
+                  <option value="">Select a saved trip</option>
+                  {trips.savedTrips.map((trip) => (
+                    <option key={trip.id} value={trip.id}>
+                      {trip.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <button
+                className="trip-reopen-button"
+                disabled={
+                  dataMode === "mock" || apiBusy || !trips.selectedTripId
+                }
+                onClick={handleReopenTrip}
+                type="button"
+              >
+                Reopen trip
+              </button>
+            </section>
+          </div>
+
           <ItineraryView
             editing={{
               isDirty: itineraryEditor.isDirty,
