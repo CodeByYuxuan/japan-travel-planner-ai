@@ -5,11 +5,17 @@ import { loadApiEnv, type ApiEnvConfig } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { createSessionMiddleware } from "./middleware/session.js";
 import { healthRouter } from "./routes/health.js";
+import { createItinerariesRouter } from "./routes/itineraries.js";
 import { createTripsRouter } from "./routes/trips.js";
+import {
+  createAiItineraryService,
+  type AiItineraryService
+} from "./services/aiItinerary/generateItinerary.js";
 import { createTripService, type TripService } from "./services/tripService.js";
 
 export type CreateAppOptions = {
   env?: ApiEnvConfig;
+  aiItineraryService?: AiItineraryService;
   sessionMiddleware?: RequestHandler;
   tripService?: TripService;
 };
@@ -21,6 +27,8 @@ export function createApp(options: CreateAppOptions = {}) {
     createSessionMiddleware({
       secret: env.jwtSecret
     });
+  const aiItineraryService =
+    options.aiItineraryService ?? createAiItineraryService(env);
   const tripService = options.tripService ?? createTripService();
   const app = express();
 
@@ -32,6 +40,7 @@ export function createApp(options: CreateAppOptions = {}) {
   );
   app.use(express.json());
   app.use("/api/health", healthRouter);
+  app.use("/api/itineraries", createItinerariesRouter(aiItineraryService));
   app.use("/api/trips", sessionMiddleware, createTripsRouter(tripService));
   app.use(errorHandler);
 
