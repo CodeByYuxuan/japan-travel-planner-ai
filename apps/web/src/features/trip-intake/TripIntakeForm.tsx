@@ -12,7 +12,10 @@ import {
 export type TripIntakeFormProps = {
   initialValues?: TripIntakeFormValues;
   isSubmitting?: boolean;
-  onMockSubmit: (request: TripRequest) => void;
+  mockSubmitLabel?: string;
+  onMockSubmit?: (request: TripRequest) => void;
+  onSubmitTrip: (request: TripRequest) => void;
+  submitLabel?: string;
 };
 
 const fieldIds = {
@@ -48,7 +51,10 @@ function FieldError({
 export function TripIntakeForm({
   initialValues = tripIntakeInitialValues,
   isSubmitting = false,
-  onMockSubmit
+  mockSubmitLabel,
+  onMockSubmit,
+  onSubmitTrip,
+  submitLabel = "Create saved itinerary"
 }: TripIntakeFormProps) {
   const [values, setValues] = useState<TripIntakeFormValues>(initialValues);
   const [errors, setErrors] = useState<TripIntakeErrors>({});
@@ -71,15 +77,18 @@ export function TripIntakeForm({
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  function submitValidated(onSubmit: (request: TripRequest) => void) {
     const validation = validateTripIntake(values);
     setErrors(validation.errors);
 
     if (validation.success) {
-      onMockSubmit(validation.request);
+      onSubmit(validation.request);
     }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    submitValidated(onSubmitTrip);
   }
 
   return (
@@ -93,8 +102,8 @@ export function TripIntakeForm({
         <p className="section-kicker">Trip setup</p>
         <h2 id="trip-intake-title">Plan your Japan route</h2>
         <p>
-          Set the travel frame, then preview the structured mock itinerary for
-          this MVP.
+          Set the travel frame, then create or preview the structured itinerary
+          for this MVP.
         </p>
       </header>
 
@@ -241,13 +250,25 @@ export function TripIntakeForm({
         </div>
       </div>
 
-      <button
-        className="trip-intake-submit"
-        disabled={isSubmitting}
-        type="submit"
-      >
-        {isSubmitting ? "Preparing preview" : "Generate mock itinerary"}
-      </button>
+      <div className="trip-intake-actions">
+        <button
+          className="trip-intake-submit"
+          disabled={isSubmitting}
+          type="submit"
+        >
+          {isSubmitting ? "Preparing itinerary" : submitLabel}
+        </button>
+        {onMockSubmit && mockSubmitLabel ? (
+          <button
+            className="trip-intake-secondary"
+            disabled={isSubmitting}
+            onClick={() => submitValidated(onMockSubmit)}
+            type="button"
+          >
+            {mockSubmitLabel}
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }

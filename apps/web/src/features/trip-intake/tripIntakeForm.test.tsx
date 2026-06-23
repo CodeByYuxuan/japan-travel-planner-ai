@@ -14,7 +14,7 @@ import {
 describe("TripIntakeForm", () => {
   test("renders the required trip request fields", () => {
     const html = renderToString(
-      <TripIntakeForm onMockSubmit={() => undefined} />
+      <TripIntakeForm onSubmitTrip={() => undefined} />
     );
 
     expect(html).toContain("Start date");
@@ -24,6 +24,19 @@ describe("TripIntakeForm", () => {
     expect(html).toContain("Travel pace");
     expect(html).toContain("Budget");
     expect(html).toContain("Constraints");
+  });
+
+  test("renders an optional mock preview action", () => {
+    const html = renderToString(
+      <TripIntakeForm
+        mockSubmitLabel="Use mock preview"
+        onMockSubmit={() => undefined}
+        onSubmitTrip={() => undefined}
+      />
+    );
+
+    expect(html).toContain("Create saved itinerary");
+    expect(html).toContain("Use mock preview");
   });
 
   test("returns required field errors", () => {

@@ -217,6 +217,11 @@ select {
   align-items: start;
 }
 
+.planner-sidebar-panel {
+  display: grid;
+  gap: 16px;
+}
+
 .trip-intake-form {
   display: grid;
   gap: 22px;
@@ -297,9 +302,18 @@ select {
   line-height: 1.35;
 }
 
-.trip-intake-submit {
+.trip-intake-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.trip-intake-submit,
+.trip-intake-secondary,
+.trip-reopen-button,
+.storage-actions button,
+.mode-toggle button {
   width: 100%;
-  border: 0;
+  border: 1px solid #0d3b4f;
   border-radius: 6px;
   background: #0d3b4f;
   color: #ffffff;
@@ -308,9 +322,88 @@ select {
   padding: 12px 16px;
 }
 
-.trip-intake-submit:disabled {
+.trip-intake-secondary,
+.storage-actions button,
+.mode-toggle button {
+  background: #ffffff;
+  color: #0d3b4f;
+}
+
+.mode-toggle button[aria-pressed="true"] {
+  background: #0d3b4f;
+  color: #ffffff;
+}
+
+.trip-intake-submit:disabled,
+.trip-intake-secondary:disabled,
+.trip-reopen-button:disabled,
+.storage-actions button:disabled,
+.mode-toggle button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.trip-storage-panel {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #d8e0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 24px;
+}
+
+.trip-storage-panel h2 {
+  margin: 10px 0 0;
+  color: #172026;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.mode-toggle,
+.storage-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.storage-status,
+.storage-error {
+  margin: 0;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
+.storage-status {
+  background: #edf4f6;
+  color: #0d3b4f;
+}
+
+.storage-error {
+  border: 1px solid #efb6ae;
+  background: #fff1ef;
+  color: #9d3027;
+}
+
+.saved-trip-select {
+  display: grid;
+  gap: 7px;
+  color: #172026;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.saved-trip-select select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cfd9df;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172026;
+  padding: 10px 11px;
 }
 
 .itinerary-view {
@@ -742,8 +835,11 @@ select {
 
   .activity-card-actions,
   .activity-editor-actions,
-  .reorder-controls {
+  .mode-toggle,
+  .reorder-controls,
+  .storage-actions {
     display: grid;
+    grid-template-columns: 1fr;
   }
 
   .activity-editor-backdrop {
