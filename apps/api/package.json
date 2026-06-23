@@ -5,16 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm build && node dist/server.js",
-    "build": "pnpm db:generate && rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "pnpm --filter @japan-travel-planner/shared build && pnpm db:generate && rm -rf dist && tsc -p tsconfig.build.json",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:validate": "prisma validate",
     "start": "node dist/server.js",
-    "typecheck": "pnpm db:generate && tsc -p tsconfig.json --noEmit",
-    "test": "pnpm db:generate && vitest run"
+    "typecheck": "pnpm --filter @japan-travel-planner/shared build && pnpm db:generate && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @japan-travel-planner/shared build && pnpm db:generate && vitest run"
   },
   "dependencies": {
+    "@japan-travel-planner/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "cors": "^2.8.6",
