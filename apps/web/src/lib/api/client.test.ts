@@ -43,8 +43,11 @@ describe("createTripApiClient", () => {
   test("creates trips with included anonymous session credentials", async () => {
     const trip = createTripRecord();
     const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        jsonResponse({ trip })
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return jsonResponse({ trip });
+      }
     );
     const client = createTripApiClient({
       baseUrl: "http://localhost:3001",
@@ -85,11 +88,16 @@ describe("createTripApiClient", () => {
       })
     ];
     const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        responses.shift() ??
-        jsonResponse({
-          trip
-        })
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return (
+          responses.shift() ??
+          jsonResponse({
+            trip
+          })
+        );
+      }
     );
     const client = createTripApiClient({
       baseUrl: "http://localhost:3001",
@@ -119,8 +127,10 @@ describe("createTripApiClient", () => {
 
   test("parses structured API errors for UI display", async () => {
     const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        jsonResponse(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return jsonResponse(
           {
             error: {
               code: "VALIDATION_ERROR",
@@ -136,7 +146,8 @@ describe("createTripApiClient", () => {
           {
             status: 400
           }
-        )
+        );
+      }
     );
     const client = createTripApiClient({
       baseUrl: "http://localhost:3001",
@@ -160,6 +171,7 @@ describe("createTripApiClient", () => {
 
   test("reports unavailable API errors without leaking fetch internals", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL) => {
+      void _input;
       throw new TypeError("fetch failed");
     });
     const client = createTripApiClient({
