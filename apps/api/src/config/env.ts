@@ -1,19 +1,26 @@
 export type ApiEnvConfig = {
   apiPort: number;
+  openAiApiKey: string | undefined;
+  openAiModel: string;
   webOrigin: string;
   jwtSecret: string;
 };
 
 const localDevelopmentJwtSecret = "local-development-session-secret-change-me";
+const defaultOpenAiModel = "gpt-5.5";
 
 export const defaultApiEnv = {
   apiPort: 3001,
+  openAiApiKey: undefined,
+  openAiModel: defaultOpenAiModel,
   webOrigin: "http://localhost:5173",
   jwtSecret: localDevelopmentJwtSecret
 } satisfies ApiEnvConfig;
 
 type ApiEnvSource = {
   API_PORT?: string | undefined;
+  OPENAI_API_KEY?: string | undefined;
+  OPENAI_MODEL?: string | undefined;
   WEB_ORIGIN?: string | undefined;
   JWT_SECRET?: string | undefined;
   NODE_ENV?: string | undefined;
@@ -55,6 +62,22 @@ function parseWebOrigin(value: string | undefined) {
   }
 }
 
+function parseOpenAiApiKey(value: string | undefined) {
+  const rawApiKey = value?.trim();
+
+  return rawApiKey && rawApiKey.length > 0 ? rawApiKey : undefined;
+}
+
+function parseOpenAiModel(value: string | undefined) {
+  const rawModel = value?.trim();
+
+  if (rawModel === undefined || rawModel.length === 0) {
+    return defaultApiEnv.openAiModel;
+  }
+
+  return rawModel;
+}
+
 function parseJwtSecret(
   value: string | undefined,
   nodeEnv: string | undefined
@@ -79,6 +102,8 @@ function parseJwtSecret(
 export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
   return {
     apiPort: parseApiPort(env.API_PORT),
+    openAiApiKey: parseOpenAiApiKey(env.OPENAI_API_KEY),
+    openAiModel: parseOpenAiModel(env.OPENAI_MODEL),
     webOrigin: parseWebOrigin(env.WEB_ORIGIN),
     jwtSecret: parseJwtSecret(env.JWT_SECRET, env.NODE_ENV)
   };
