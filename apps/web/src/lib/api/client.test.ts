@@ -125,6 +125,58 @@ describe("createTripApiClient", () => {
     ).toBe(true);
   });
 
+  test("generates itineraries with included anonymous session credentials", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return jsonResponse({
+          itinerary: mockItinerary,
+          metadata: {
+            attempts: 1,
+            estimatedCostUsd: null,
+            model: "gpt-test-model",
+            repaired: false,
+            tokenUsage: null
+          }
+        });
+      }
+    );
+    const client = createTripApiClient({
+      baseUrl: "http://localhost:3001",
+      fetch: fetchMock
+    });
+
+    const response = await client.generateItinerary(mockTripRequest);
+    const firstCall = fetchMock.mock.calls[0];
+
+    if (!firstCall) {
+      throw new Error("Expected fetch to be called");
+    }
+
+    const [url, init] = firstCall;
+
+    expect(response).toEqual({
+      itinerary: mockItinerary,
+      metadata: {
+        attempts: 1,
+        estimatedCostUsd: null,
+        model: "gpt-test-model",
+        repaired: false,
+        tokenUsage: null
+      }
+    });
+    expect(url).toBe("http://localhost:3001/api/itineraries/generate");
+    expect(init).toMatchObject({
+      credentials: "include",
+      method: "POST"
+    });
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      cities: mockTripRequest.cities,
+      interests: mockTripRequest.interests
+    });
+  });
+
   test("parses structured API errors for UI display", async () => {
     const fetchMock = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) => {
@@ -166,6 +218,44 @@ describe("createTripApiClient", () => {
       ],
       message: "Request validation failed.",
       status: 400
+    });
+  });
+
+  test("parses structured generation API errors for UI display", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return jsonResponse(
+          {
+            error: {
+              code: "AI_PROVIDER_CONFIGURATION_ERROR",
+              details: {
+                reason: "PROVIDER_CONFIGURATION"
+              },
+              message: "AI itinerary generation is not configured."
+            }
+          },
+          {
+            status: 500
+          }
+        );
+      }
+    );
+    const client = createTripApiClient({
+      baseUrl: "http://localhost:3001",
+      fetch: fetchMock
+    });
+
+    await expect(
+      client.generateItinerary(mockTripRequest)
+    ).rejects.toMatchObject({
+      code: "AI_PROVIDER_CONFIGURATION_ERROR",
+      details: {
+        reason: "PROVIDER_CONFIGURATION"
+      },
+      message: "AI itinerary generation is not configured.",
+      status: 500
     });
   });
 

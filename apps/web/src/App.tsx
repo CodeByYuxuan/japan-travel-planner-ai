@@ -8,6 +8,7 @@ import {
   cloneItinerary,
   useItineraryEditor
 } from "./features/itinerary/editing/useItineraryEditor.js";
+import { useGeneratedItinerary } from "./features/itinerary/useGeneratedItinerary.js";
 import { TripIntakeForm } from "./features/trip-intake/index.js";
 import {
   getDefaultTripDataMode,
@@ -36,20 +37,28 @@ export function App() {
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const [isMockSubmitting, setIsMockSubmitting] = useState(false);
+  const generatedItinerary = useGeneratedItinerary();
   const itineraryEditor = useItineraryEditor(null);
   const itinerary = itineraryEditor.itinerary;
   const trips = useTrips();
   const apiBusy = isApiBusy(trips.status);
+  const isGenerating = generatedItinerary.status === "generating";
   const isSubmitting =
     isMockSubmitting ||
+    isGenerating ||
     trips.status === "creating" ||
     trips.status === "saving";
-  const storageMessage = localError ?? trips.errorMessage;
+  const storageMessage =
+    localError ?? generatedItinerary.errorMessage ?? trips.errorMessage;
 
   const workspacePanels = [
     {
       title: "Trip setup",
-      status: isSubmitting ? "Submitting" : "Ready",
+      status: isGenerating
+        ? "Generating"
+        : isSubmitting
+          ? "Submitting"
+          : "Ready",
       detail: "Dates, cities, pace, budget, and interests"
     },
     {
@@ -83,8 +92,10 @@ export function App() {
     setActiveRequest(request);
     setLocalError(null);
     trips.clearError();
+    generatedItinerary.clearError();
     setIsMockSubmitting(true);
     itineraryEditor.resetItinerary(null);
+    trips.selectTrip(null);
 
     setTimeout(() => {
       resetToItinerary(mockItinerary);
@@ -100,15 +111,15 @@ export function App() {
 
     setActiveRequest(request);
     setLocalError(null);
+    trips.clearError();
+    generatedItinerary.clearError();
     resetToItinerary(null);
+    trips.selectTrip(null);
 
-    const result = await trips.createTripFromRequest(
-      request,
-      cloneItinerary(mockItinerary)
-    );
+    const result = await generatedItinerary.generateItinerary(request);
 
     if (result) {
-      setActiveRequest(result.request);
+      setActiveRequest(request);
       resetToItinerary(result.itinerary);
     }
   }
@@ -125,6 +136,7 @@ export function App() {
     }
 
     setLocalError(null);
+    generatedItinerary.clearError();
 
     const result = await trips.saveTrip(
       trips.selectedTripId,
@@ -145,6 +157,7 @@ export function App() {
     }
 
     setLocalError(null);
+    generatedItinerary.clearError();
 
     const result = await trips.reopenTrip(trips.selectedTripId);
 
@@ -156,6 +169,7 @@ export function App() {
 
   async function handleLoadSavedTrips() {
     setLocalError(null);
+    generatedItinerary.clearError();
     await trips.loadSavedTrips();
   }
 
@@ -163,6 +177,7 @@ export function App() {
     setDataMode(nextMode);
     setLocalError(null);
     trips.clearError();
+    generatedItinerary.clearError();
   }
 
   return (
@@ -235,7 +250,7 @@ export function App() {
               onSubmitTrip={handleTripSubmit}
               submitLabel={
                 dataMode === "api"
-                  ? "Create saved itinerary"
+                  ? "Generate AI itinerary"
                   : "Generate mock itinerary"
               }
               {...(dataMode === "api"
@@ -273,15 +288,19 @@ export function App() {
               </div>
 
               <p className="storage-status" role="status">
-                {apiBusy
-                  ? "Working"
-                  : trips.status === "saved"
-                    ? "Saved"
-                    : itineraryEditor.isDirty
-                      ? "Local edits pending"
-                      : dataMode === "mock"
-                        ? "Mock mode"
-                        : "Ready"}
+                {isGenerating
+                  ? "Generating itinerary"
+                  : generatedItinerary.status === "error"
+                    ? "Generation needs retry"
+                    : apiBusy
+                      ? "Working"
+                      : trips.status === "saved"
+                        ? "Saved"
+                        : itineraryEditor.isDirty
+                          ? "Local edits pending"
+                          : dataMode === "mock"
+                            ? "Mock mode"
+                            : "Ready"}
               </p>
 
               {storageMessage ? (

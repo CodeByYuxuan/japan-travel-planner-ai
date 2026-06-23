@@ -10,7 +10,7 @@ describe("App", () => {
     expect(html).toContain("Japan Travel Planner");
     expect(html).toContain("Japan trip planner");
     expect(html).toContain("Plan your Japan route");
-    expect(html).toContain("Create saved itinerary");
+    expect(html).toContain("Generate AI itinerary");
     expect(html).toContain("Use mock preview");
     expect(html).toContain("Save and reopen");
     expect(html).toContain("Refresh saved trips");

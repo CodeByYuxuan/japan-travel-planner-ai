@@ -41,6 +41,16 @@ function createTripRecord(overrides: Partial<TripRecord> = {}): TripRecord {
 function createMockClient(trip = createTripRecord()): TripApiClient {
   return {
     createTrip: vi.fn(async () => trip),
+    generateItinerary: vi.fn(async () => ({
+      itinerary: mockItinerary,
+      metadata: {
+        attempts: 1,
+        estimatedCostUsd: null,
+        model: "gpt-test-model",
+        repaired: false,
+        tokenUsage: null
+      }
+    })),
     getTrip: vi.fn(async () => trip),
     listTrips: vi.fn(async () => [trip]),
     updateTrip: vi.fn(async () => trip)
