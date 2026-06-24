@@ -299,6 +299,15 @@ test("traveler can plan and edit a mock itinerary", async ({ page }) => {
   await expect(
     dayOne.getByRole("heading", { name: "Morning walk through Ueno Park" })
   ).toBeVisible();
+  await expect(
+    dayOne.getByRole("link", { name: "Open in Google Maps" }).first()
+  ).toHaveAttribute(
+    "href",
+    "https://www.google.com/maps/search/?api=1&query=Ueno%20Park%20Tokyo"
+  );
+  await expect(
+    dayOne.getByRole("link", { name: "Open in Google Maps" }).first()
+  ).toHaveAttribute("target", "_blank");
 
   await page
     .getByRole("button", { name: "Edit Morning walk through Ueno Park" })
@@ -371,6 +380,12 @@ test("traveler can generate and edit an itinerary from a mocked AI API response"
   await expect(
     dayOne.getByRole("heading", { name: "Generated Senso-ji morning" })
   ).toBeVisible();
+  await expect(
+    dayOne.getByRole("link", { name: "Open in Google Maps" }).first()
+  ).toHaveAttribute(
+    "href",
+    "https://www.google.com/maps/search/?api=1&query=Generated%20Senso-ji%20morning%20Senso-ji%20Tokyo"
+  );
   await expect(
     page.getByRole("button", { name: "Save itinerary" })
   ).toBeEnabled();
