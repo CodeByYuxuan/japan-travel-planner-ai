@@ -12,6 +12,10 @@ import {
   createAiItineraryService,
   type AiItineraryProvider
 } from "./generateItinerary.js";
+import {
+  createConsoleAiUsageLogger,
+  type AiUsageLogEntry
+} from "./usageLogger.js";
 
 const representativeTripRequest = {
   startDate: "2026-04-06",
@@ -81,11 +85,13 @@ const validModelOutput = {
 
 describe("AiItineraryService", () => {
   test("returns a validated itinerary for valid model output", async () => {
-    const { createResponse, service } = createTestService([
+    const { createResponse, service, usageEntries } = createTestService([
       JSON.stringify(validModelOutput)
     ]);
 
-    const result = await service.generateItinerary(representativeTripRequest);
+    const result = await service.generateItinerary(representativeTripRequest, {
+      requestIdentifier: "198.51.100.10"
+    });
 
     expect(itinerarySchema.safeParse(result.itinerary).success).toBe(true);
     expect(result).toMatchObject({
@@ -105,10 +111,21 @@ describe("AiItineraryService", () => {
     expect(createResponse.mock.calls[0]?.[0].input).toContain(
       "Dates: 2026-04-06 to 2026-04-07"
     );
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 1,
+        estimatedCostUsd: null,
+        model: "gpt-test-model",
+        outcome: "success",
+        tokenUsage: null
+      })
+    ]);
+    expect(usageEntries[0]?.requestIdentifierHash).toHaveLength(64);
+    expect(JSON.stringify(usageEntries[0])).not.toContain("198.51.100.10");
   });
 
   test("repairs invalid first output once and returns the repaired itinerary", async () => {
-    const { createResponse, service } = createTestService([
+    const { createResponse, service, usageEntries } = createTestService([
       "not valid json",
       JSON.stringify(validModelOutput)
     ]);
@@ -129,10 +146,17 @@ describe("AiItineraryService", () => {
     expect(createResponse.mock.calls[1]?.[0].instructions).toContain(
       "Return corrected structured JSON only"
     );
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 2,
+        model: "gpt-test-model",
+        outcome: "repaired_success"
+      })
+    ]);
   });
 
   test("returns a structured generation failure after invalid output and invalid repair", async () => {
-    const { createResponse, service } = createTestService([
+    const { createResponse, service, usageEntries } = createTestService([
       "not valid json",
       JSON.stringify({
         ...validModelOutput,
@@ -152,10 +176,17 @@ describe("AiItineraryService", () => {
       statusCode: 502
     } satisfies Partial<ApiError>);
     expect(createResponse).toHaveBeenCalledTimes(2);
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 2,
+        model: "gpt-test-model",
+        outcome: "invalid_model_output"
+      })
+    ]);
   });
 
   test("maps provider failures to a safe structured error", async () => {
-    const { service } = createTestService([
+    const { service, usageEntries } = createTestService([
       new Error("secret provider detail")
     ]);
 
@@ -169,10 +200,25 @@ describe("AiItineraryService", () => {
       message: "AI itinerary provider request failed.",
       statusCode: 502
     } satisfies Partial<ApiError>);
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 1,
+        model: null,
+        outcome: "provider_request_failed"
+      })
+    ]);
+    expect(JSON.stringify(usageEntries[0])).not.toContain(
+      "secret provider detail"
+    );
   });
 
   test("fails clearly when generation is invoked without OPENAI_API_KEY", async () => {
-    const service = createAiItineraryService(defaultApiEnv);
+    const usageEntries: AiUsageLogEntry[] = [];
+    const service = createAiItineraryService(defaultApiEnv, {
+      usageLogger: createConsoleAiUsageLogger({
+        sink: (entry) => usageEntries.push(entry)
+      })
+    });
 
     await expect(
       service.generateItinerary(representativeTripRequest)
@@ -184,6 +230,13 @@ describe("AiItineraryService", () => {
       message: "AI itinerary generation is not configured.",
       statusCode: 500
     } satisfies Partial<ApiError>);
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 0,
+        model: null,
+        outcome: "provider_configuration_error"
+      })
+    ]);
   });
 });
 
@@ -192,8 +245,10 @@ function createTestService(responses: Array<string | Error>): {
     typeof vi.fn<AiItineraryProvider["createResponse"]>
   >;
   service: AiItineraryService;
+  usageEntries: AiUsageLogEntry[];
 } {
   const pendingResponses = [...responses];
+  const usageEntries: AiUsageLogEntry[] = [];
   const createResponse = vi.fn<AiItineraryProvider["createResponse"]>(
     async () => {
       const response = pendingResponses.shift();
@@ -219,7 +274,12 @@ function createTestService(responses: Array<string | Error>): {
   return {
     createResponse,
     service: new AiItineraryService({
-      providerFactory: () => provider
-    })
+      providerFactory: () => provider,
+      usageLogger: createConsoleAiUsageLogger({
+        clock: () => new Date("2026-01-01T00:00:00.000Z"),
+        sink: (entry) => usageEntries.push(entry)
+      })
+    }),
+    usageEntries
   };
 }

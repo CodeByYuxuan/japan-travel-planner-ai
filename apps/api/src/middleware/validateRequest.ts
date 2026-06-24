@@ -1,16 +1,27 @@
-import type { RequestHandler } from "express";
-import type { ZodType } from "zod";
+import type { Request, RequestHandler } from "express";
+import type { ZodError, ZodType } from "zod";
 
 import {
   createApiErrorResponse,
   zodIssuesToFieldErrors
 } from "../errors/ApiError.js";
 
-export function validateRequest(schema: ZodType): RequestHandler {
+export type ValidateRequestOptions = {
+  onValidationError?: (context: { error: ZodError; request: Request }) => void;
+};
+
+export function validateRequest(
+  schema: ZodType,
+  options: ValidateRequestOptions = {}
+): RequestHandler {
   return (request, response, next) => {
     const result = schema.safeParse(request.body);
 
     if (!result.success) {
+      options.onValidationError?.({
+        error: result.error,
+        request
+      });
       response.status(400).json(
         createApiErrorResponse({
           code: "VALIDATION_ERROR",
