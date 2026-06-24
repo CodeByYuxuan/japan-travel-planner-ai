@@ -14,6 +14,12 @@ import {
   AiItineraryOutputParseError,
   parseAiItineraryOutput
 } from "./schema.js";
+import {
+  type AiUsageLogger,
+  type AiUsageOutcome,
+  createConsoleAiUsageLogger,
+  recordAiUsageSafely
+} from "./usageLogger.js";
 
 export type AiItineraryProvider = {
   createResponse: (request: OpenAiTextRequest) => Promise<OpenAiTextResult>;
@@ -32,72 +38,113 @@ export type GenerateItineraryResult = {
   metadata: AiItineraryGenerationMetadata;
 };
 
+export type AiItineraryGenerationContext = {
+  requestIdentifier?: string | undefined;
+};
+
 type AiItineraryServiceOptions = {
   providerFactory: () => AiItineraryProvider;
+  usageLogger?: AiUsageLogger | undefined;
 };
 
 export class AiItineraryService {
-  constructor(private readonly options: AiItineraryServiceOptions) {}
+  private readonly usageLogger: AiUsageLogger;
+
+  constructor(private readonly options: AiItineraryServiceOptions) {
+    this.usageLogger = options.usageLogger ?? createConsoleAiUsageLogger();
+  }
 
   async generateItinerary(
-    request: TripRequest
+    request: TripRequest,
+    context: AiItineraryGenerationContext = {}
   ): Promise<GenerateItineraryResult> {
-    const provider = this.createProvider();
-    const prompt = buildItineraryPrompt(request);
-    const firstResponse = await this.createProviderResponse(provider, {
-      instructions: prompt.instructions,
-      input: prompt.input
-    });
+    let attempts = 0;
+    let model: string | null = null;
 
     try {
-      return {
-        itinerary: parseAiItineraryOutput(firstResponse.text),
-        metadata: createGenerationMetadata({
-          attempts: 1,
-          model: firstResponse.model,
-          repaired: false
-        })
-      };
-    } catch (error) {
-      if (!(error instanceof AiItineraryOutputParseError)) {
-        throw error;
-      }
-
-      const repairPrompt = buildItineraryRepairPrompt({
-        originalPrompt: prompt,
-        invalidOutput: firstResponse.text,
-        parseError: error
+      const provider = this.createProvider();
+      const prompt = buildItineraryPrompt(request);
+      attempts = 1;
+      const firstResponse = await this.createProviderResponse(provider, {
+        instructions: prompt.instructions,
+        input: prompt.input
       });
-      const repairResponse = await this.createProviderResponse(provider, {
-        instructions: repairPrompt.instructions,
-        input: repairPrompt.input
-      });
+      model = firstResponse.model;
 
       try {
-        return {
-          itinerary: parseAiItineraryOutput(repairResponse.text),
+        const result = {
+          itinerary: parseAiItineraryOutput(firstResponse.text),
           metadata: createGenerationMetadata({
-            attempts: 2,
-            model: repairResponse.model,
-            repaired: true
+            attempts: 1,
+            model: firstResponse.model,
+            repaired: false
           })
         };
-      } catch (repairError) {
-        if (repairError instanceof AiItineraryOutputParseError) {
-          throw new ApiError({
-            statusCode: 502,
-            code: "AI_ITINERARY_INVALID_OUTPUT",
-            message:
-              "AI itinerary generation returned invalid structured output.",
-            details: {
-              attempts: 2,
-              reason: "MODEL_OUTPUT_INVALID"
-            }
-          });
+
+        await this.recordUsage({
+          context,
+          metadata: result.metadata,
+          outcome: "success"
+        });
+        return result;
+      } catch (error) {
+        if (!(error instanceof AiItineraryOutputParseError)) {
+          throw error;
         }
 
-        throw repairError;
+        const repairPrompt = buildItineraryRepairPrompt({
+          originalPrompt: prompt,
+          invalidOutput: firstResponse.text,
+          parseError: error
+        });
+        attempts = 2;
+        const repairResponse = await this.createProviderResponse(provider, {
+          instructions: repairPrompt.instructions,
+          input: repairPrompt.input
+        });
+        model = repairResponse.model;
+
+        try {
+          const result = {
+            itinerary: parseAiItineraryOutput(repairResponse.text),
+            metadata: createGenerationMetadata({
+              attempts: 2,
+              model: repairResponse.model,
+              repaired: true
+            })
+          };
+
+          await this.recordUsage({
+            context,
+            metadata: result.metadata,
+            outcome: "repaired_success"
+          });
+          return result;
+        } catch (repairError) {
+          if (repairError instanceof AiItineraryOutputParseError) {
+            throw new ApiError({
+              statusCode: 502,
+              code: "AI_ITINERARY_INVALID_OUTPUT",
+              message:
+                "AI itinerary generation returned invalid structured output.",
+              details: {
+                attempts: 2,
+                reason: "MODEL_OUTPUT_INVALID"
+              }
+            });
+          }
+
+          throw repairError;
+        }
       }
+    } catch (error) {
+      await this.recordFailureUsage({
+        attempts,
+        context,
+        error,
+        model
+      });
+      throw error;
     }
   }
 
@@ -119,13 +166,52 @@ export class AiItineraryService {
       throw mapGenerationError(error);
     }
   }
+
+  private async recordUsage(options: {
+    context: AiItineraryGenerationContext;
+    metadata: AiItineraryGenerationMetadata;
+    outcome: AiUsageOutcome;
+  }) {
+    await recordAiUsageSafely(this.usageLogger, {
+      attempts: options.metadata.attempts,
+      estimatedCostUsd: options.metadata.estimatedCostUsd,
+      model: options.metadata.model,
+      outcome: options.outcome,
+      requestIdentifier: options.context.requestIdentifier,
+      tokenUsage: options.metadata.tokenUsage
+    });
+  }
+
+  private async recordFailureUsage(options: {
+    attempts: number;
+    context: AiItineraryGenerationContext;
+    error: unknown;
+    model: string | null;
+  }) {
+    const outcome = generationErrorToUsageOutcome(options.error);
+
+    if (outcome === null) {
+      return;
+    }
+
+    await recordAiUsageSafely(this.usageLogger, {
+      attempts: options.attempts,
+      estimatedCostUsd: null,
+      model: options.model,
+      outcome,
+      requestIdentifier: options.context.requestIdentifier,
+      tokenUsage: null
+    });
+  }
 }
 
 export function createAiItineraryService(
-  env: ApiEnvConfig = loadApiEnv()
+  env: ApiEnvConfig = loadApiEnv(),
+  options: { usageLogger?: AiUsageLogger } = {}
 ): AiItineraryService {
   return new AiItineraryService({
-    providerFactory: () => createOpenAiProviderFromEnv(env)
+    providerFactory: () => createOpenAiProviderFromEnv(env),
+    usageLogger: options.usageLogger
   });
 }
 
@@ -167,4 +253,24 @@ function mapGenerationError(error: unknown): ApiError {
       reason: "PROVIDER_FAILURE"
     }
   });
+}
+
+function generationErrorToUsageOutcome(error: unknown): AiUsageOutcome | null {
+  if (!(error instanceof ApiError)) {
+    return null;
+  }
+
+  if (error.code === "AI_PROVIDER_CONFIGURATION_ERROR") {
+    return "provider_configuration_error";
+  }
+
+  if (error.code === "AI_PROVIDER_REQUEST_FAILED") {
+    return "provider_request_failed";
+  }
+
+  if (error.code === "AI_ITINERARY_INVALID_OUTPUT") {
+    return "invalid_model_output";
+  }
+
+  return null;
 }

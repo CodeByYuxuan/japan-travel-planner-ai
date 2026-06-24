@@ -8,11 +8,17 @@ import {
 } from "@japan-travel-planner/shared";
 
 import { createApp } from "../app.js";
-import { defaultApiEnv } from "../config/env.js";
+import { defaultApiEnv, type ApiEnvConfig } from "../config/env.js";
 import {
   AiItineraryService,
   type AiItineraryProvider
 } from "../services/aiItinerary/generateItinerary.js";
+import {
+  createConsoleAiUsageLogger,
+  type AiUsageLogEntry
+} from "../services/aiItinerary/usageLogger.js";
+import type { TripRepository } from "../repositories/tripRepository.js";
+import { TripService } from "../services/tripService.js";
 
 const validTripRequest = {
   startDate: "2026-04-06",
@@ -82,7 +88,7 @@ const validModelOutput = {
 
 describe("POST /api/itineraries/generate", () => {
   test("returns a validated itinerary for a valid request with mocked AI success", async () => {
-    const { app, createResponse } = createItineraryTestApp([
+    const { app, createResponse, usageEntries } = createItineraryTestApp([
       JSON.stringify(validModelOutput)
     ]);
 
@@ -106,10 +112,22 @@ describe("POST /api/itineraries/generate", () => {
       costLevel: "free"
     });
     expect(createResponse).toHaveBeenCalledTimes(1);
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 1,
+        estimatedCostUsd: null,
+        model: "gpt-test-model",
+        outcome: "success",
+        tokenUsage: null
+      })
+    ]);
+    expect(JSON.stringify(usageEntries[0])).not.toContain(
+      "Avoid late-night activities"
+    );
   });
 
   test("returns validation errors for an invalid trip request", async () => {
-    const { app, createResponse } = createItineraryTestApp([
+    const { app, createResponse, usageEntries } = createItineraryTestApp([
       JSON.stringify(validModelOutput)
     ]);
 
@@ -138,6 +156,14 @@ describe("POST /api/itineraries/generate", () => {
       ])
     );
     expect(createResponse).not.toHaveBeenCalled();
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 0,
+        model: null,
+        outcome: "validation_error",
+        tokenUsage: null
+      })
+    ]);
   });
 
   test("returns a structured error when model output remains invalid after repair", async () => {
@@ -167,7 +193,16 @@ describe("POST /api/itineraries/generate", () => {
   });
 
   test("returns a structured missing-key error when generation is invoked without OpenAI config", async () => {
-    const response = await request(createApp({ env: defaultApiEnv }))
+    const usageEntries: AiUsageLogEntry[] = [];
+    const usageLogger = createConsoleAiUsageLogger({
+      sink: (entry) => usageEntries.push(entry)
+    });
+    const response = await request(
+      createApp({
+        aiUsageLogger: usageLogger,
+        env: defaultApiEnv
+      })
+    )
       .post("/api/itineraries/generate")
       .send(validTripRequest);
 
@@ -180,11 +215,102 @@ describe("POST /api/itineraries/generate", () => {
       },
       message: "AI itinerary generation is not configured."
     });
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        attempts: 0,
+        model: null,
+        outcome: "provider_configuration_error"
+      })
+    ]);
+  });
+
+  test("rate limits generation with a structured API error", async () => {
+    const { app, createResponse, usageEntries } = createItineraryTestApp(
+      [JSON.stringify(validModelOutput)],
+      {
+        env: {
+          ...defaultApiEnv,
+          aiGenerationRateLimitMax: 1,
+          aiGenerationRateLimitWindowMs: 60_000
+        }
+      }
+    );
+
+    const firstResponse = await request(app)
+      .post("/api/itineraries/generate")
+      .send(validTripRequest);
+    const secondResponse = await request(app)
+      .post("/api/itineraries/generate")
+      .send(validTripRequest);
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(429);
+    expect(secondResponse.headers["retry-after"]).toBe("60");
+    expect(apiErrorSchema.safeParse(secondResponse.body).success).toBe(true);
+    expect(secondResponse.body).toEqual({
+      error: {
+        code: "RATE_LIMITED",
+        details: {
+          retryAfterSeconds: 60
+        },
+        message: "Too many itinerary generation requests. Try again later."
+      }
+    });
+    expect(createResponse).toHaveBeenCalledTimes(1);
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        outcome: "success"
+      }),
+      expect.objectContaining({
+        attempts: 0,
+        model: null,
+        outcome: "rate_limited",
+        tokenUsage: null
+      })
+    ]);
+  });
+
+  test("generation rate limit does not affect health or Trip CRUD routes", async () => {
+    const { app } = createItineraryTestApp([JSON.stringify(validModelOutput)], {
+      env: {
+        ...defaultApiEnv,
+        aiGenerationRateLimitMax: 1,
+        aiGenerationRateLimitWindowMs: 60_000
+      },
+      tripService: createEmptyTripService()
+    });
+
+    await request(app).post("/api/itineraries/generate").send(validTripRequest);
+    await request(app).post("/api/itineraries/generate").send(validTripRequest);
+
+    const healthResponse = await request(app).get("/api/health");
+    const tripListResponse = await request(app).get("/api/trips");
+
+    expect(healthResponse.status).toBe(200);
+    expect(healthResponse.body).toEqual({
+      service: "japan-travel-planner-api",
+      status: "ok"
+    });
+    expect(tripListResponse.status).toBe(200);
+    expect(tripListResponse.body).toEqual({
+      trips: []
+    });
   });
 });
 
-function createItineraryTestApp(responses: Array<string | Error>) {
+function createItineraryTestApp(
+  responses: Array<string | Error>,
+  options: {
+    env?: ApiEnvConfig | undefined;
+    tripService?: TripService | undefined;
+  } = {}
+) {
   const pendingResponses = [...responses];
+  const usageEntries: AiUsageLogEntry[] = [];
+  const usageLogger = createConsoleAiUsageLogger({
+    clock: () => new Date("2026-01-01T00:00:00.000Z"),
+    sink: (entry) => usageEntries.push(entry)
+  });
   const createResponse = vi.fn<AiItineraryProvider["createResponse"]>(
     async () => {
       const response = pendingResponses.shift();
@@ -207,14 +333,37 @@ function createItineraryTestApp(responses: Array<string | Error>) {
     createResponse
   } satisfies AiItineraryProvider;
   const aiItineraryService = new AiItineraryService({
-    providerFactory: () => provider
+    providerFactory: () => provider,
+    usageLogger
   });
 
   return {
     app: createApp({
       aiItineraryService,
-      env: defaultApiEnv
+      aiUsageLogger: usageLogger,
+      env: options.env ?? defaultApiEnv,
+      ...(options.tripService !== undefined
+        ? { tripService: options.tripService }
+        : {})
     }),
-    createResponse
+    createResponse,
+    usageEntries
   };
+}
+
+function createEmptyTripService() {
+  const repository = {
+    createTrip: async () => {
+      throw new Error("createTrip should not be called in this test.");
+    },
+    deleteTrip: async () => false,
+    findOrCreateOwner: async () => ({
+      id: "owner-1"
+    }),
+    findTrip: async () => null,
+    listTrips: async () => [],
+    updateTrip: async () => null
+  } satisfies TripRepository;
+
+  return new TripService(repository);
 }
