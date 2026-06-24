@@ -5,6 +5,19 @@ import type {
 } from "../../../../../packages/shared/src/schemas/itinerary.js";
 import type { TripRequest } from "../../../../../packages/shared/src/schemas/tripRequest.js";
 
+export type GenerateItineraryMetadata = {
+  attempts: number;
+  repaired: boolean;
+  model: string;
+  tokenUsage: null;
+  estimatedCostUsd: null;
+};
+
+export type GenerateItineraryResponse = {
+  itinerary: Itinerary;
+  metadata: GenerateItineraryMetadata;
+};
+
 export type TripActivityRecord = Activity & {
   id: string;
 };

@@ -2,7 +2,12 @@ import {
   apiErrorSchema,
   type ApiFieldError
 } from "../../../../../packages/shared/src/schemas/apiError.js";
-import type { TripRecord, TripWritePayload } from "./types.js";
+import type { TripRequest } from "../../../../../packages/shared/src/schemas/tripRequest.js";
+import type {
+  GenerateItineraryResponse,
+  TripRecord,
+  TripWritePayload
+} from "./types.js";
 
 export type TripApiClientOptions = {
   baseUrl?: string;
@@ -11,6 +16,7 @@ export type TripApiClientOptions = {
 
 export type TripApiClientErrorOptions = {
   code: string;
+  details?: unknown;
   fieldErrors?: ApiFieldError[] | undefined;
   message: string;
   status?: number | undefined;
@@ -18,6 +24,7 @@ export type TripApiClientErrorOptions = {
 
 export class TripApiClientError extends Error {
   readonly code: string;
+  readonly details: unknown;
   readonly fieldErrors: ApiFieldError[] | undefined;
   readonly status: number | undefined;
 
@@ -25,6 +32,7 @@ export class TripApiClientError extends Error {
     super(options.message);
     this.name = "TripApiClientError";
     this.code = options.code;
+    this.details = options.details;
     this.fieldErrors = options.fieldErrors;
     this.status = options.status;
   }
@@ -32,6 +40,9 @@ export class TripApiClientError extends Error {
 
 export type TripApiClient = {
   createTrip: (payload: TripWritePayload) => Promise<TripRecord>;
+  generateItinerary: (
+    payload: TripRequest
+  ) => Promise<GenerateItineraryResponse>;
   getTrip: (tripId: string) => Promise<TripRecord>;
   listTrips: () => Promise<TripRecord[]>;
   updateTrip: (
@@ -68,6 +79,7 @@ function createApiError(response: Response, body: unknown) {
   if (parsedError.success) {
     return new TripApiClientError({
       code: parsedError.data.error.code,
+      details: parsedError.data.error.details,
       message: parsedError.data.error.message,
       status: response.status,
       ...(parsedError.data.error.fieldErrors !== undefined
@@ -133,6 +145,16 @@ export function createTripApiClient(
       });
 
       return response.trip;
+    },
+
+    async generateItinerary(payload) {
+      return requestJson<GenerateItineraryResponse>(
+        "/api/itineraries/generate",
+        {
+          body: JSON.stringify(payload),
+          method: "POST"
+        }
+      );
     },
 
     async getTrip(tripId) {
