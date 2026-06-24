@@ -4,6 +4,7 @@ export type ApiEnvConfig = {
   apiPort: number;
   openAiApiKey: string | undefined;
   openAiModel: string;
+  weatherApiKey: string | undefined;
   webOrigin: string;
   jwtSecret: string;
 };
@@ -17,6 +18,7 @@ export const defaultApiEnv = {
   apiPort: 3001,
   openAiApiKey: undefined,
   openAiModel: defaultOpenAiModel,
+  weatherApiKey: undefined,
   webOrigin: "http://localhost:5173",
   jwtSecret: localDevelopmentJwtSecret
 } satisfies ApiEnvConfig;
@@ -27,6 +29,7 @@ type ApiEnvSource = {
   API_PORT?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
   OPENAI_MODEL?: string | undefined;
+  WEATHER_API_KEY?: string | undefined;
   WEB_ORIGIN?: string | undefined;
   JWT_SECRET?: string | undefined;
   NODE_ENV?: string | undefined;
@@ -94,6 +97,12 @@ function parseOpenAiApiKey(value: string | undefined) {
   return rawApiKey && rawApiKey.length > 0 ? rawApiKey : undefined;
 }
 
+function parseWeatherApiKey(value: string | undefined) {
+  const rawApiKey = value?.trim();
+
+  return rawApiKey && rawApiKey.length > 0 ? rawApiKey : undefined;
+}
+
 function parseOpenAiModel(value: string | undefined) {
   const rawModel = value?.trim();
 
@@ -140,6 +149,7 @@ export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
     apiPort: parseApiPort(env.API_PORT),
     openAiApiKey: parseOpenAiApiKey(env.OPENAI_API_KEY),
     openAiModel: parseOpenAiModel(env.OPENAI_MODEL),
+    weatherApiKey: parseWeatherApiKey(env.WEATHER_API_KEY),
     webOrigin: parseWebOrigin(env.WEB_ORIGIN),
     jwtSecret: parseJwtSecret(env.JWT_SECRET, env.NODE_ENV)
   };

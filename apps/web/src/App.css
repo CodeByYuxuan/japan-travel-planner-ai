@@ -568,6 +568,55 @@ select {
   padding-left: 12px;
 }
 
+.trip-day-weather-missing {
+  color: #657480;
+  font-style: italic;
+}
+
+.weather-summary-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.weather-summary-condition,
+.weather-summary-note {
+  margin: 0;
+}
+
+.weather-summary-condition {
+  color: #172026;
+  font-weight: 800;
+}
+
+.weather-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+.weather-summary-meta div {
+  min-width: 120px;
+  border: 1px solid #dce4ea;
+  border-radius: 6px;
+  background: #f8fafb;
+  padding: 9px 10px;
+}
+
+.weather-summary-meta dt {
+  color: #657480;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.weather-summary-meta dd {
+  margin: 4px 0 0;
+  color: #172026;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .activity-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

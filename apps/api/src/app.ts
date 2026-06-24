@@ -9,6 +9,10 @@ import {
   createGoogleMapsProvider,
   type MapsProvider
 } from "./providers/maps/mapsProvider.js";
+import {
+  createOpenWeatherProvider,
+  type WeatherProvider
+} from "./providers/weather/weatherProvider.js";
 import { createEnrichmentRouter } from "./routes/enrichment.js";
 import { healthRouter } from "./routes/health.js";
 import { createItinerariesRouter } from "./routes/itineraries.js";
@@ -32,6 +36,7 @@ export type CreateAppOptions = {
   mapsProvider?: MapsProvider;
   sessionMiddleware?: RequestHandler;
   tripService?: TripService;
+  weatherProvider?: WeatherProvider;
 };
 
 export function createApp(options: CreateAppOptions = {}) {
@@ -65,6 +70,11 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   const tripService = options.tripService ?? createTripService();
   const mapsProvider = options.mapsProvider ?? createGoogleMapsProvider();
+  const weatherProvider =
+    options.weatherProvider ??
+    createOpenWeatherProvider({
+      apiKey: env.weatherApiKey
+    });
   const app = express();
 
   app.use(
@@ -75,7 +85,10 @@ export function createApp(options: CreateAppOptions = {}) {
   );
   app.use(express.json());
   app.use("/api/health", healthRouter);
-  app.use("/api/enrichment", createEnrichmentRouter({ mapsProvider }));
+  app.use(
+    "/api/enrichment",
+    createEnrichmentRouter({ mapsProvider, weatherProvider })
+  );
   app.use(
     "/api/itineraries",
     createItinerariesRouter(aiItineraryService, {
