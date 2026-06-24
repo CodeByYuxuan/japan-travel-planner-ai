@@ -43,6 +43,24 @@ describe("ItineraryView", () => {
     expect(html).toContain("ready for generated or mock trip data");
   });
 
+  test("renders itinerary days when weather summaries are missing", () => {
+    const itineraryWithoutWeather = {
+      ...mockItinerary,
+      days: mockItinerary.days.map((day) => ({
+        date: day.date,
+        city: day.city,
+        ...(day.summary !== undefined ? { summary: day.summary } : {}),
+        activities: day.activities
+      }))
+    };
+    const html = renderToString(
+      <ItineraryView itinerary={itineraryWithoutWeather} />
+    );
+
+    expect(html).toContain("Morning walk through Ueno Park");
+    expect(html).not.toContain("Weather unavailable");
+  });
+
   test("renders a loading state", () => {
     const html = renderToString(
       <ItineraryView itinerary={mockItinerary} isLoading />

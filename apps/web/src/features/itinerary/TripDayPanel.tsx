@@ -4,6 +4,7 @@ import type {
 } from "../../../../../packages/shared/src/schemas/itinerary.js";
 
 import { ActivityCard } from "./ActivityCard.js";
+import { WeatherSummary } from "./WeatherSummary.js";
 import type { ReorderDirection } from "./editing/useItineraryEditor.js";
 
 export type TripDayEditingControls = {
@@ -47,9 +48,7 @@ export function TripDayPanel({ day, dayNumber, editing }: TripDayPanelProps) {
       </div>
 
       {day.summary ? <p className="trip-day-summary">{day.summary}</p> : null}
-      {day.weatherSummary ? (
-        <p className="trip-day-weather">{day.weatherSummary}</p>
-      ) : null}
+      <WeatherSummary summary={day.weatherSummary} />
 
       <div className="activity-list">
         {day.activities.map((activity, index) => {

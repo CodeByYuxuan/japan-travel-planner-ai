@@ -15,6 +15,7 @@ describe("loadApiEnv", () => {
         API_PORT: "4001",
         OPENAI_API_KEY: "sk-test-api-key",
         OPENAI_MODEL: "gpt-test-model",
+        WEATHER_API_KEY: "weather-test-key",
         WEB_ORIGIN: "https://planner.example.com",
         JWT_SECRET: "test-session-secret-value"
       })
@@ -24,14 +25,16 @@ describe("loadApiEnv", () => {
       apiPort: 4001,
       openAiApiKey: "sk-test-api-key",
       openAiModel: "gpt-test-model",
+      weatherApiKey: "weather-test-key",
       webOrigin: "https://planner.example.com",
       jwtSecret: "test-session-secret-value"
     });
   });
 
-  test("does not require OPENAI_API_KEY during API env loading", () => {
+  test("does not require provider keys during API env loading", () => {
     expect(loadApiEnv({}).openAiApiKey).toBeUndefined();
     expect(loadApiEnv({}).openAiModel).toBe(defaultApiEnv.openAiModel);
+    expect(loadApiEnv({}).weatherApiKey).toBeUndefined();
   });
 
   test("fails clearly for invalid API_PORT", () => {
