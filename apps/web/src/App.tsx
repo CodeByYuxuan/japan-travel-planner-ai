@@ -48,6 +48,10 @@ export function App() {
     isGenerating ||
     trips.status === "creating" ||
     trips.status === "saving";
+  const saveButtonLabel =
+    trips.status === "error" && itineraryEditor.isDirty
+      ? "Retry save"
+      : "Save itinerary";
   const storageMessage =
     localError ?? generatedItinerary.errorMessage ?? trips.errorMessage;
 
@@ -75,6 +79,8 @@ export function App() {
       status:
         dataMode === "mock"
           ? "Mock mode"
+          : trips.status === "error" && itineraryEditor.isDirty
+            ? "Retry needed"
           : trips.status === "saved"
             ? "Saved"
             : "API ready",
@@ -148,6 +154,13 @@ export function App() {
       setActiveRequest(result.request);
       resetToItinerary(result.itinerary);
     }
+  }
+
+  function handleRevertItinerary() {
+    itineraryEditor.revertItinerary();
+    setLocalError(null);
+    trips.clearError();
+    generatedItinerary.clearError();
   }
 
   async function handleReopenTrip() {
@@ -294,6 +307,8 @@ export function App() {
                     ? "Generation needs retry"
                     : apiBusy
                       ? "Working"
+                      : trips.status === "error" && itineraryEditor.isDirty
+                        ? "Retry or revert local edits"
                       : trips.status === "saved"
                         ? "Saved"
                         : itineraryEditor.isDirty
@@ -315,7 +330,14 @@ export function App() {
                   onClick={handleSaveItinerary}
                   type="button"
                 >
-                  Save itinerary
+                  {saveButtonLabel}
+                </button>
+                <button
+                  disabled={apiBusy || !itinerary || !itineraryEditor.isDirty}
+                  onClick={handleRevertItinerary}
+                  type="button"
+                >
+                  Revert local edits
                 </button>
                 <button
                   disabled={dataMode === "mock" || apiBusy}

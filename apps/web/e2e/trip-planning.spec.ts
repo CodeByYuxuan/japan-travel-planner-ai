@@ -173,6 +173,7 @@ async function routeTripPersistence(
   let savedTrip: ReturnType<typeof createTripRecordFromPayload> | null = null;
   let saveAttempts = 0;
   let lastSavedPayload: TripWritePayload | null = null;
+  let lastUpdatedPayload: TripWritePayload | null = null;
 
   await page.route("**/api/trips", async (route) => {
     if (isOptionsRequest(route)) {
@@ -229,19 +230,36 @@ async function routeTripPersistence(
       return;
     }
 
-    expect(route.request().method()).toBe("GET");
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: corsHeaders,
+        json: {
+          trip: savedTrip
+        },
+        status: savedTrip ? 200 : 404
+      });
+      return;
+    }
+
+    expect(route.request().method()).toBe("PATCH");
+    saveAttempts += 1;
+    lastUpdatedPayload = route.request().postDataJSON() as TripWritePayload;
+    savedTrip = createTripRecordFromPayload(lastUpdatedPayload);
+
     await route.fulfill({
       contentType: "application/json",
       headers: corsHeaders,
       json: {
         trip: savedTrip
       },
-      status: savedTrip ? 200 : 404
+      status: 200
     });
   });
 
   return {
     getLastSavedPayload: () => lastSavedPayload,
+    getLastUpdatedPayload: () => lastUpdatedPayload,
     getSaveAttempts: () => saveAttempts
   };
 }
@@ -317,6 +335,15 @@ test("traveler can plan and edit a mock itinerary", async ({ page }) => {
     "Nishiki Market snack break",
     "Gion and Shirakawa evening walk"
   ]);
+
+  await page.getByRole("button", { name: "Revert local edits" }).click();
+  await expect(page.getByText("Unsaved local edits")).toHaveCount(0);
+  await expect(
+    dayOne.getByRole("heading", { name: "Morning walk through Ueno Park" })
+  ).toBeVisible();
+  await expect(
+    dayOne.getByRole("heading", { name: editedTitle })
+  ).toHaveCount(0);
 });
 
 test("traveler can generate and edit an itinerary from a mocked AI API response", async ({
@@ -406,9 +433,16 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
       .getByRole("alert")
       .getByText("Trip storage is temporarily unavailable.")
   ).toBeVisible();
+  await expect(
+    dayOne.getByRole("heading", { name: savedEditedTitle })
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry save" })).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Revert local edits" })
+  ).toBeEnabled();
   expect(persistence.getSaveAttempts()).toBe(1);
 
-  await page.getByRole("button", { name: "Save itinerary" }).click();
+  await page.getByRole("button", { name: "Retry save" }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(
     page
@@ -457,4 +491,48 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
   await expect(
     page.getByRole("button", { name: `Edit ${savedEditedTitle}` })
   ).toBeVisible();
+
+  await page.getByRole("button", { name: `Edit ${savedEditedTitle}` }).click();
+  const reopenedDialog = page.getByRole("dialog", {
+    name: `Edit ${savedEditedTitle}`
+  });
+  await expect(reopenedDialog).toBeVisible();
+
+  const patchedEditedTitle = "Patched generated Senso-ji afternoon";
+  await reopenedDialog.getByLabel("Title").fill(patchedEditedTitle);
+  await reopenedDialog.getByRole("button", { name: "Save activity" }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Day 1: Tokyo" })
+      .getByRole("heading", { name: patchedEditedTitle })
+  ).toBeVisible();
+  await page
+    .getByRole("region", { name: "Day 1: Tokyo" })
+    .getByRole("button", { name: `Move ${patchedEditedTitle} down` })
+    .click();
+  await expect(page.getByText("Unsaved local edits")).toBeVisible();
+
+  await page.getByRole("button", { name: "Save itinerary" }).click();
+  await expect(page.getByText("Unsaved local edits")).toHaveCount(0);
+
+  const patchedPayload = persistence.getLastUpdatedPayload();
+
+  if (!patchedPayload) {
+    throw new Error("Expected reopened itinerary edits to be patched.");
+  }
+
+  expect(patchedPayload.days[0]?.activities.map((activity) => activity.title))
+    .toEqual(["Generated Asakusa lunch", patchedEditedTitle]);
+
+  await page.reload();
+  await page.getByRole("button", { name: "API" }).click();
+  await page.getByRole("button", { name: "Refresh saved trips" }).click();
+  await page.getByLabel("Saved trips").selectOption("generated-trip-1");
+  await page.getByRole("button", { name: "Reopen trip" }).click();
+
+  const reopenedDayOne = page.getByRole("region", { name: "Day 1: Tokyo" });
+  await expect(reopenedDayOne.getByRole("heading", { level: 4 })).toHaveText([
+    "Generated Asakusa lunch",
+    patchedEditedTitle
+  ]);
 });

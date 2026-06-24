@@ -176,4 +176,81 @@ describe("itineraryEditorReducer", () => {
     expect(dirtyState.isDirty).toBe(true);
     expect(resetState.isDirty).toBe(false);
   });
+
+  test("marks a successful save result as the clean editor baseline", () => {
+    const state = createItineraryEditorState(mockItinerary);
+    const activity = getDay(state, "2026-04-06").activities[0];
+
+    if (!activity?.id) {
+      throw new Error("Expected editable activity id");
+    }
+
+    const dirtyState = itineraryEditorReducer(state, {
+      type: "updateActivity",
+      dayDate: "2026-04-06",
+      activityId: activity.id,
+      activity: {
+        ...activity,
+        title: "Optimistic local title"
+      }
+    });
+    const savedItinerary = {
+      ...mockItinerary,
+      days: mockItinerary.days.map((day) =>
+        day.date === "2026-04-06"
+          ? {
+              ...day,
+              activities: day.activities.map((candidateActivity, index) =>
+                index === 0
+                  ? {
+                      ...candidateActivity,
+                      title: "Server-confirmed title"
+                    }
+                  : candidateActivity
+              )
+            }
+          : day
+      )
+    };
+    const savedState = itineraryEditorReducer(dirtyState, {
+      type: "reset",
+      itinerary: savedItinerary
+    });
+
+    expect(savedState.isDirty).toBe(false);
+    expect(getDay(savedState, "2026-04-06").activities[0]?.title).toBe(
+      "Server-confirmed title"
+    );
+  });
+
+  test("reverts dirty edits to the last clean itinerary", () => {
+    const state = createItineraryEditorState(mockItinerary);
+    const activity = getDay(state, "2026-04-06").activities[0];
+
+    if (!activity?.id) {
+      throw new Error("Expected editable activity id");
+    }
+
+    const dirtyState = itineraryEditorReducer(state, {
+      type: "updateActivity",
+      dayDate: "2026-04-06",
+      activityId: activity.id,
+      activity: {
+        ...activity,
+        title: "Failed save should not become baseline"
+      }
+    });
+    const revertedState = itineraryEditorReducer(dirtyState, {
+      type: "revert"
+    });
+
+    expect(dirtyState.isDirty).toBe(true);
+    expect(getDay(dirtyState, "2026-04-06").activities[0]?.title).toBe(
+      "Failed save should not become baseline"
+    );
+    expect(revertedState.isDirty).toBe(false);
+    expect(getDay(revertedState, "2026-04-06").activities[0]?.title).toBe(
+      activity.title
+    );
+  });
 });
