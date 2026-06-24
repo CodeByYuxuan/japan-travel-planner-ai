@@ -8,8 +8,9 @@ import {
   WeatherProviderConfigurationError,
   type WeatherProvider
 } from "../providers/weather/weatherProvider.js";
-import { createMapLink } from "../services/enrichment/mapEnrichment.js";
-import { createWeatherSummary } from "../services/enrichment/weatherEnrichment.js";
+import type { ProviderResultCache } from "../services/enrichment/cache.js";
+import { createCachedMapLink } from "../services/enrichment/mapEnrichment.js";
+import { createCachedWeatherSummary } from "../services/enrichment/weatherEnrichment.js";
 
 const mapLinkBodySchema = z
   .object({
@@ -73,6 +74,7 @@ function asyncHandler(handler: RequestHandler): RequestHandler {
 
 export function createEnrichmentRouter(options: {
   mapsProvider: MapsProvider;
+  providerResultCache: ProviderResultCache;
   weatherProvider: WeatherProvider;
 }) {
   const router = Router();
@@ -82,7 +84,11 @@ export function createEnrichmentRouter(options: {
     validateRequest(mapLinkBodySchema),
     asyncHandler(async (request, response) => {
       response.status(200).json({
-        mapUrl: createMapLink(request.body, options.mapsProvider)
+        mapUrl: await createCachedMapLink(
+          request.body,
+          options.mapsProvider,
+          options.providerResultCache
+        )
       });
     })
   );
@@ -92,9 +98,10 @@ export function createEnrichmentRouter(options: {
     validateRequest(weatherSummaryBodySchema),
     asyncHandler(async (request, response) => {
       try {
-        const result = await createWeatherSummary(
+        const result = await createCachedWeatherSummary(
           request.body,
-          options.weatherProvider
+          options.weatherProvider,
+          options.providerResultCache
         );
 
         response.status(200).json(result);

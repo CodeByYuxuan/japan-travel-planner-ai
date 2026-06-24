@@ -11,10 +11,15 @@ import {
   type WeatherProvider,
   type WeatherSummary
 } from "../providers/weather/weatherProvider.js";
-
-const defaultMapsProvider = {
-  createSearchLink: vi.fn(() => null)
-} satisfies MapsProvider;
+import type {
+  ProviderResultRecord,
+  ProviderResultRepository,
+  ProviderResultWriteInput
+} from "../repositories/providerResultRepository.js";
+import {
+  createProviderResultCache,
+  type ProviderResultCache
+} from "../services/enrichment/cache.js";
 
 const weatherSummary = {
   city: "Tokyo",
@@ -38,20 +43,65 @@ const weatherSummary = {
 
 function createEnrichmentTestApp(options: {
   mapsProvider?: MapsProvider | undefined;
+  providerResultCache?: ProviderResultCache | undefined;
   weatherProvider?: WeatherProvider | undefined;
-}) {
+} = {}) {
   return createApp({
     env: defaultApiEnv,
-    mapsProvider: options.mapsProvider ?? defaultMapsProvider,
+    providerResultCache:
+      options.providerResultCache ?? createMemoryProviderResultCache(),
+    ...(options.mapsProvider !== undefined
+      ? { mapsProvider: options.mapsProvider }
+      : {}),
     ...(options.weatherProvider !== undefined
       ? { weatherProvider: options.weatherProvider }
       : {})
   });
 }
 
+class InMemoryProviderResultRepository implements ProviderResultRepository {
+  private readonly records = new Map<string, ProviderResultRecord>();
+  private nextId = 1;
+
+  async findUsable(cacheKey: string, now = new Date()) {
+    const record = this.records.get(cacheKey);
+
+    if (record === undefined || record.expiresAt <= now) {
+      return null;
+    }
+
+    return structuredClone(record);
+  }
+
+  async upsert(input: ProviderResultWriteInput) {
+    const timestamp = new Date("2026-06-25T00:00:00.000Z");
+    const existingRecord = this.records.get(input.cacheKey);
+    const record: ProviderResultRecord = {
+      id: existingRecord?.id ?? `provider-result-${this.nextId++}`,
+      provider: input.provider,
+      operation: input.operation,
+      cacheKey: input.cacheKey,
+      requestHash: input.requestHash,
+      requestJson: structuredClone(input.requestJson),
+      responseJson: structuredClone(input.responseJson),
+      expiresAt: input.expiresAt,
+      createdAt: existingRecord?.createdAt ?? timestamp,
+      updatedAt: timestamp
+    };
+
+    this.records.set(input.cacheKey, record);
+
+    return structuredClone(record);
+  }
+}
+
+function createMemoryProviderResultCache() {
+  return createProviderResultCache(new InMemoryProviderResultRepository());
+}
+
 describe("POST /api/enrichment/maps/link", () => {
   test("returns an external Google Maps search link", async () => {
-    const response = await request(createApp({ env: defaultApiEnv }))
+    const response = await request(createEnrichmentTestApp())
       .post("/api/enrichment/maps/link")
       .send({
         title: "Senso-ji morning visit",
@@ -69,7 +119,7 @@ describe("POST /api/enrichment/maps/link", () => {
   });
 
   test("returns null when no usable location is provided", async () => {
-    const response = await request(createApp({ env: defaultApiEnv }))
+    const response = await request(createEnrichmentTestApp())
       .post("/api/enrichment/maps/link")
       .send({
         title: "Only a title",
@@ -85,7 +135,7 @@ describe("POST /api/enrichment/maps/link", () => {
   });
 
   test("returns structured validation errors for invalid map link input", async () => {
-    const response = await request(createApp({ env: defaultApiEnv }))
+    const response = await request(createEnrichmentTestApp())
       .post("/api/enrichment/maps/link")
       .send({
         location: {
@@ -163,7 +213,7 @@ describe("POST /api/enrichment/weather/summary", () => {
   });
 
   test("returns a structured missing config error when WEATHER_API_KEY is absent", async () => {
-    const response = await request(createApp({ env: defaultApiEnv }))
+    const response = await request(createEnrichmentTestApp())
       .post("/api/enrichment/weather/summary")
       .send({
         city: "Tokyo",
@@ -254,5 +304,36 @@ describe("POST /api/enrichment/weather/summary", () => {
         })
       ])
     );
+  });
+
+  test("uses cached weather for a second identical enrichment request", async () => {
+    const weatherProvider = {
+      getDailySummary: vi.fn(async () => weatherSummary)
+    } satisfies WeatherProvider;
+    const app = createEnrichmentTestApp({ weatherProvider });
+    const payload = {
+      city: "Tokyo",
+      date: "2026-04-06"
+    };
+
+    const firstResponse = await request(app)
+      .post("/api/enrichment/weather/summary")
+      .send(payload);
+    const secondResponse = await request(app)
+      .post("/api/enrichment/weather/summary")
+      .send({
+        city: "  tokyo ",
+        date: "2026-04-06",
+        units: "metric"
+      });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.body).toEqual(firstResponse.body);
+    expect(secondResponse.body).toEqual({
+      status: "available",
+      weatherSummary
+    });
+    expect(weatherProvider.getDailySummary).toHaveBeenCalledTimes(1);
   });
 });

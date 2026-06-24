@@ -3,7 +3,14 @@ import { describe, expect, test, vi } from "vitest";
 import type { Activity } from "@japan-travel-planner/shared";
 
 import type { MapsProvider } from "../../providers/maps/mapsProvider.js";
+import type {
+  ProviderResultRecord,
+  ProviderResultRepository,
+  ProviderResultWriteInput
+} from "../../repositories/providerResultRepository.js";
+import { createProviderResultCache } from "./cache.js";
 import {
+  createCachedMapLink,
   enrichActivityWithMapLink,
   getActivityMapUrl
 } from "./mapEnrichment.js";
@@ -22,6 +29,42 @@ const activity: Activity = {
   costLevel: "free",
   notes: "Arrive before the busiest temple hours."
 };
+
+class InMemoryProviderResultRepository implements ProviderResultRepository {
+  private readonly records = new Map<string, ProviderResultRecord>();
+  private nextId = 1;
+
+  async findUsable(cacheKey: string, now = new Date()) {
+    const record = this.records.get(cacheKey);
+
+    if (record === undefined || record.expiresAt <= now) {
+      return null;
+    }
+
+    return structuredClone(record);
+  }
+
+  async upsert(input: ProviderResultWriteInput) {
+    const timestamp = new Date("2026-06-25T00:00:00.000Z");
+    const existingRecord = this.records.get(input.cacheKey);
+    const record: ProviderResultRecord = {
+      id: existingRecord?.id ?? `provider-result-${this.nextId++}`,
+      provider: input.provider,
+      operation: input.operation,
+      cacheKey: input.cacheKey,
+      requestHash: input.requestHash,
+      requestJson: structuredClone(input.requestJson),
+      responseJson: structuredClone(input.responseJson),
+      expiresAt: input.expiresAt,
+      createdAt: existingRecord?.createdAt ?? timestamp,
+      updatedAt: timestamp
+    };
+
+    this.records.set(input.cacheKey, record);
+
+    return structuredClone(record);
+  }
+}
 
 describe("map enrichment", () => {
   test("creates an activity map URL from activity location", () => {
@@ -69,5 +112,41 @@ describe("map enrichment", () => {
 
     expect(getActivityMapUrl(activity, provider)).toBeNull();
     expect(enrichActivityWithMapLink(activity, provider)).toEqual(activity);
+  });
+
+  test("uses cached map links for repeated equivalent inputs", async () => {
+    const provider = {
+      createSearchLink: vi.fn(() => "https://example.com/maps/senso-ji")
+    } satisfies MapsProvider;
+    const cache = createProviderResultCache(
+      new InMemoryProviderResultRepository()
+    );
+
+    const firstResult = await createCachedMapLink(
+      {
+        title: "Senso-ji morning visit",
+        location: {
+          city: "Tokyo",
+          name: "Senso-ji"
+        }
+      },
+      provider,
+      cache
+    );
+    const secondResult = await createCachedMapLink(
+      {
+        title: "  senso-ji   morning visit ",
+        location: {
+          name: "Senso-ji",
+          city: "tokyo"
+        }
+      },
+      provider,
+      cache
+    );
+
+    expect(firstResult).toBe("https://example.com/maps/senso-ji");
+    expect(secondResult).toBe(firstResult);
+    expect(provider.createSearchLink).toHaveBeenCalledTimes(1);
   });
 });

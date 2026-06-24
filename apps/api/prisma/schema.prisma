@@ -131,3 +131,20 @@ model ShareLink {
 
   @@index([tripId])
 }
+
+model ProviderResult {
+  id           String   @id @default(cuid())
+  provider     String
+  operation    String
+  cacheKey     String   @unique
+  requestHash  String
+  requestJson  Json
+  responseJson Json
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([provider])
+  @@index([provider, operation])
+  @@index([expiresAt])
+}
