@@ -5,6 +5,11 @@ import { loadApiEnv, type ApiEnvConfig } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { createRateLimitMiddleware } from "./middleware/rateLimit.js";
 import { createSessionMiddleware } from "./middleware/session.js";
+import {
+  createGoogleMapsProvider,
+  type MapsProvider
+} from "./providers/maps/mapsProvider.js";
+import { createEnrichmentRouter } from "./routes/enrichment.js";
 import { healthRouter } from "./routes/health.js";
 import { createItinerariesRouter } from "./routes/itineraries.js";
 import { createTripsRouter } from "./routes/trips.js";
@@ -24,6 +29,7 @@ export type CreateAppOptions = {
   aiGenerationRateLimitMiddleware?: RequestHandler;
   aiItineraryService?: AiItineraryService;
   aiUsageLogger?: AiUsageLogger;
+  mapsProvider?: MapsProvider;
   sessionMiddleware?: RequestHandler;
   tripService?: TripService;
 };
@@ -58,6 +64,7 @@ export function createApp(options: CreateAppOptions = {}) {
       windowMs: env.aiGenerationRateLimitWindowMs
     });
   const tripService = options.tripService ?? createTripService();
+  const mapsProvider = options.mapsProvider ?? createGoogleMapsProvider();
   const app = express();
 
   app.use(
@@ -68,6 +75,7 @@ export function createApp(options: CreateAppOptions = {}) {
   );
   app.use(express.json());
   app.use("/api/health", healthRouter);
+  app.use("/api/enrichment", createEnrichmentRouter({ mapsProvider }));
   app.use(
     "/api/itineraries",
     createItinerariesRouter(aiItineraryService, {

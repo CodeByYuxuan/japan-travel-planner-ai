@@ -5,6 +5,7 @@ import type {
 } from "../../../../../packages/shared/src/schemas/itinerary.js";
 import { ReorderControls } from "./editing/ReorderControls.js";
 import type { ReorderDirection } from "./editing/useItineraryEditor.js";
+import { createActivityGoogleMapsUrl } from "./mapLinks.js";
 
 const categoryLabels: Record<ActivityCategory, string> = {
   sightseeing: "Sightseeing",
@@ -64,6 +65,8 @@ export function ActivityCard({ activity, editingControls }: ActivityCardProps) {
     activity.location.address ??
     activity.location.city ??
     activity.location.name;
+  const mapUrl =
+    activity.location.mapUrl ?? createActivityGoogleMapsUrl(activity);
 
   return (
     <article className="activity-card">
@@ -97,14 +100,14 @@ export function ActivityCard({ activity, editingControls }: ActivityCardProps) {
 
       <p className="activity-notes">{activity.notes}</p>
 
-      {activity.location.mapUrl ? (
+      {mapUrl ? (
         <a
           className="activity-map-link"
-          href={activity.location.mapUrl}
+          href={mapUrl}
           rel="noreferrer"
           target="_blank"
         >
-          Open map
+          Open in Google Maps
         </a>
       ) : null}
 
