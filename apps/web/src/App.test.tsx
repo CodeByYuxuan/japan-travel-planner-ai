@@ -13,6 +13,7 @@ describe("App", () => {
     expect(html).toContain("Generate AI itinerary");
     expect(html).toContain("Use mock preview");
     expect(html).toContain("Save and reopen");
+    expect(html).toContain("Revert local edits");
     expect(html).toContain("Refresh saved trips");
     expect(html).toContain("No itinerary yet");
     expect(html).toContain("API");

@@ -10,6 +10,7 @@ export type ReorderDirection = "up" | "down";
 export type ItineraryEditorState = {
   itinerary: Itinerary | null;
   isDirty: boolean;
+  lastSavedItinerary: Itinerary | null;
   nextActivityNumber: number;
 };
 
@@ -39,6 +40,9 @@ export type ItineraryEditorAction =
       dayDate: string;
       activityId: string;
       direction: ReorderDirection;
+    }
+  | {
+      type: "revert";
     };
 
 function cloneActivity(activity: Activity): Activity {
@@ -87,6 +91,9 @@ export function createItineraryEditorState(
   return {
     itinerary: editableItinerary,
     isDirty: false,
+    lastSavedItinerary: editableItinerary
+      ? cloneItinerary(editableItinerary)
+      : null,
     nextActivityNumber: activityCount + 1
   };
 }
@@ -122,6 +129,10 @@ export function itineraryEditorReducer(
 ): ItineraryEditorState {
   if (action.type === "reset") {
     return createItineraryEditorState(action.itinerary);
+  }
+
+  if (action.type === "revert") {
+    return createItineraryEditorState(state.lastSavedItinerary);
   }
 
   if (!state.itinerary) {
@@ -221,6 +232,7 @@ export function useItineraryEditor(initialItinerary: Itinerary | null = null) {
   return {
     itinerary: state.itinerary,
     isDirty: state.isDirty,
+    revertItinerary: () => dispatch({ type: "revert" }),
     resetItinerary: (itinerary: Itinerary | null) =>
       dispatch({ type: "reset", itinerary }),
     addActivity: (dayDate: string, activity: Activity) =>
