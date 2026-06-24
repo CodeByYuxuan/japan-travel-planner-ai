@@ -10,7 +10,8 @@ import {
   createSavedTrip,
   getTripErrorMessage,
   reopenSavedTrip,
-  saveTrip
+  saveTrip,
+  type TripOperationResult
 } from "./useTrips.js";
 
 function createTripRecord(overrides: Partial<TripRecord> = {}): TripRecord {
@@ -54,6 +55,51 @@ function createMockClient(trip = createTripRecord()): TripApiClient {
     getTrip: vi.fn(async () => trip),
     listTrips: vi.fn(async () => [trip]),
     updateTrip: vi.fn(async () => trip)
+  };
+}
+
+function createGeneratedTripResult(
+  overrides: {
+    itineraryTitle?: string;
+    firstActivityTitle?: string;
+    tripId?: string;
+  } = {}
+) {
+  const itineraryTitle =
+    overrides.itineraryTitle ?? "AI Generated Tokyo And Kyoto Route";
+  const firstActivityTitle =
+    overrides.firstActivityTitle ?? "Generated Senso-ji morning";
+  const itinerary = {
+    ...mockItinerary,
+    title: itineraryTitle,
+    days: mockItinerary.days.map((day, dayIndex) => ({
+      ...day,
+      activities: day.activities.map((activity, activityIndex) => ({
+        ...activity,
+        id: `generated-${dayIndex + 1}-${activityIndex + 1}`,
+        title:
+          dayIndex === 0 && activityIndex === 0
+            ? firstActivityTitle
+            : activity.title
+      }))
+    }))
+  };
+  const trip = createTripRecord({
+    id: overrides.tripId ?? "generated-trip-1",
+    title: itinerary.title,
+    days: itinerary.days.map((day, dayIndex) => ({
+      id: `generated-day-${dayIndex + 1}`,
+      ...day,
+      activities: day.activities.map((activity) => ({
+        ...activity,
+        id: activity.id ?? `generated-activity-${dayIndex + 1}`
+      }))
+    }))
+  });
+
+  return {
+    itinerary,
+    trip
   };
 }
 
@@ -115,6 +161,76 @@ describe("trip API workflow helpers", () => {
 
     expect(client.createTrip).toHaveBeenCalledOnce();
     expect(client.updateTrip).not.toHaveBeenCalled();
+  });
+
+  test("saves generated itineraries with original request metadata", async () => {
+    const { itinerary, trip } = createGeneratedTripResult();
+    const client = createMockClient(trip);
+
+    const result = await saveTrip(client, {
+      itinerary,
+      request: mockTripRequest,
+      tripId: null
+    });
+
+    expect(client.createTrip).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budget: mockTripRequest.budget,
+        cities: mockTripRequest.cities,
+        constraints: mockTripRequest.constraints,
+        interests: mockTripRequest.interests,
+        pace: mockTripRequest.pace,
+        title: "AI Generated Tokyo And Kyoto Route"
+      })
+    );
+    expect(result.request).toEqual(mockTripRequest);
+    expect(result.itinerary.title).toBe("AI Generated Tokyo And Kyoto Route");
+  });
+
+  test("saves the currently edited generated itinerary data", async () => {
+    const { itinerary, trip } = createGeneratedTripResult({
+      firstActivityTitle: "Edited generated Senso-ji morning"
+    });
+    const client = createMockClient(trip);
+
+    await saveTrip(client, {
+      itinerary,
+      request: mockTripRequest,
+      tripId: null
+    });
+
+    expect(client.createTrip).toHaveBeenCalledWith(
+      expect.objectContaining({
+        days: expect.arrayContaining([
+          expect.objectContaining({
+            activities: expect.arrayContaining([
+              expect.objectContaining({
+                title: "Edited generated Senso-ji morning"
+              })
+            ])
+          })
+        ])
+      })
+    );
+  });
+
+  test("reopens saved generated trips into editable itinerary state", async () => {
+    const { trip } = createGeneratedTripResult({
+      firstActivityTitle: "Saved generated Senso-ji morning"
+    });
+    const client = createMockClient(trip);
+
+    const result: TripOperationResult = await reopenSavedTrip(
+      client,
+      "generated-trip-1"
+    );
+
+    expect(result.request).toEqual(mockTripRequest);
+    expect(result.itinerary.title).toBe("AI Generated Tokyo And Kyoto Route");
+    expect(result.itinerary.days[0]?.activities[0]).toMatchObject({
+      id: "generated-1-1",
+      title: "Saved generated Senso-ji morning"
+    });
   });
 
   test("reopens saved trips through the API client", async () => {
