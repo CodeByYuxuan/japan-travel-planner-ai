@@ -11,6 +11,7 @@ import {
   toTripWritePayload,
   tripRecordToItinerary,
   tripRecordToTripRequest,
+  type ShareLinkRecord,
   type TripRecord
 } from "../../lib/api/types.js";
 
@@ -23,7 +24,8 @@ export type TripOperationStatus =
   | "loading"
   | "reopening"
   | "saved"
-  | "saving";
+  | "saving"
+  | "sharing";
 
 export type TripOperationResult = {
   itinerary: Itinerary;
@@ -99,6 +101,13 @@ export async function reopenSavedTrip(
   };
 }
 
+export async function createShareLink(
+  client: TripApiClient,
+  tripId: string
+) {
+  return client.createShareLink(tripId);
+}
+
 function upsertTrip(trips: TripRecord[], trip: TripRecord) {
   const existingIndex = trips.findIndex(
     (candidate) => candidate.id === trip.id
@@ -119,6 +128,9 @@ export function useTrips(options: { client?: TripApiClient } = {}) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savedTrips, setSavedTrips] = useState<TripRecord[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [shareLinksByTripId, setShareLinksByTripId] = useState<
+    Record<string, ShareLinkRecord>
+  >({});
   const [status, setStatus] = useState<TripOperationStatus>("idle");
 
   function rememberTrip(trip: TripRecord) {
@@ -151,6 +163,25 @@ export function useTrips(options: { client?: TripApiClient } = {}) {
       runOperation("creating", () =>
         createSavedTrip(client, request, itinerary)
       ),
+    createShareLink: async (tripId: string) => {
+      setStatus("sharing");
+      setErrorMessage(null);
+
+      try {
+        const shareLink = await createShareLink(client, tripId);
+
+        setShareLinksByTripId((currentShareLinks) => ({
+          ...currentShareLinks,
+          [tripId]: shareLink
+        }));
+        setStatus("saved");
+        return shareLink;
+      } catch (error) {
+        setErrorMessage(getTripErrorMessage(error));
+        setStatus("error");
+        return null;
+      }
+    },
     errorMessage,
     loadSavedTrips: async () => {
       setStatus("loading");
@@ -184,6 +215,7 @@ export function useTrips(options: { client?: TripApiClient } = {}) {
     savedTrips,
     selectedTripId,
     selectTrip: setSelectedTripId,
+    shareLinksByTripId,
     status
   };
 }

@@ -37,6 +37,21 @@ export type TripRecord = Omit<Itinerary, "days"> &
 
 export type TripWritePayload = TripRequest & Itinerary;
 
+export type SharePermission = "read_only";
+
+export type ShareLinkRecord = {
+  token: string;
+  permission: SharePermission;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SharedTripRecord = {
+  share: ShareLinkRecord;
+  trip: TripRecord;
+};
+
 export function tripRecordToItinerary(trip: TripRecord): Itinerary {
   return {
     title: trip.title,

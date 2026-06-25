@@ -9,6 +9,7 @@ import {
   useItineraryEditor
 } from "./features/itinerary/editing/useItineraryEditor.js";
 import { useGeneratedItinerary } from "./features/itinerary/useGeneratedItinerary.js";
+import { ShareControls } from "./features/sharing/ShareControls.js";
 import { TripIntakeForm } from "./features/trip-intake/index.js";
 import {
   getDefaultTripDataMode,
@@ -16,6 +17,7 @@ import {
   type TripDataMode
 } from "./features/trips/useTrips.js";
 import { mockItinerary } from "./mocks/index.js";
+import { SharedTripPage } from "./routes/SharedTripPage.js";
 
 const navigationItems = ["Planner", "Trips", "Account"];
 
@@ -26,11 +28,31 @@ function isApiBusy(status: ReturnType<typeof useTrips>["status"]) {
     status === "creating" ||
     status === "loading" ||
     status === "reopening" ||
-    status === "saving"
+    status === "saving" ||
+    status === "sharing"
   );
 }
 
+export function getShareTokenFromPathname(pathname: string) {
+  if (!pathname.startsWith("/share/")) {
+    return null;
+  }
+
+  const token = pathname.slice("/share/".length).split("/")[0] ?? "";
+
+  try {
+    return decodeURIComponent(token);
+  } catch {
+    return token;
+  }
+}
+
+function getCurrentPathname() {
+  return typeof window === "undefined" ? "/" : window.location.pathname;
+}
+
 export function App() {
+  const shareToken = getShareTokenFromPathname(getCurrentPathname());
   const [activeRequest, setActiveRequest] = useState<TripRequest | null>(null);
   const [dataMode, setDataMode] = useState<TripDataMode>(
     getDefaultTripDataMode
@@ -54,6 +76,21 @@ export function App() {
       : "Save itinerary";
   const storageMessage =
     localError ?? generatedItinerary.errorMessage ?? trips.errorMessage;
+  const selectedShareLink = trips.selectedTripId
+    ? trips.shareLinksByTripId[trips.selectedTripId]
+    : undefined;
+  const shareDisabledReason =
+    dataMode === "mock"
+      ? "Switch to API mode and save the trip before sharing."
+      : !trips.selectedTripId
+        ? "Save this itinerary before creating a public share link."
+        : itineraryEditor.isDirty
+          ? "Save local edits before sharing the itinerary."
+          : undefined;
+
+  if (shareToken !== null) {
+    return <SharedTripPage shareToken={shareToken} />;
+  }
 
   const workspacePanels = [
     {
@@ -184,6 +221,17 @@ export function App() {
     setLocalError(null);
     generatedItinerary.clearError();
     await trips.loadSavedTrips();
+  }
+
+  async function handleCreateShareLink() {
+    if (!trips.selectedTripId) {
+      setLocalError("Save this itinerary before creating a public share link.");
+      return;
+    }
+
+    setLocalError(null);
+    generatedItinerary.clearError();
+    await trips.createShareLink(trips.selectedTripId);
   }
 
   function handleModeChange(nextMode: TripDataMode) {
@@ -376,6 +424,14 @@ export function App() {
               >
                 Reopen trip
               </button>
+
+              <ShareControls
+                disabledReason={shareDisabledReason}
+                isSharing={trips.status === "sharing"}
+                onCreateShareLink={handleCreateShareLink}
+                shareLink={selectedShareLink}
+                tripId={trips.selectedTripId}
+              />
             </section>
           </div>
 

@@ -7,6 +7,7 @@ import {
 import type { TripRecord } from "../../lib/api/types.js";
 import { mockItinerary, mockTripRequest } from "../../mocks/index.js";
 import {
+  createShareLink,
   createSavedTrip,
   getTripErrorMessage,
   reopenSavedTrip,
@@ -41,6 +42,13 @@ function createTripRecord(overrides: Partial<TripRecord> = {}): TripRecord {
 
 function createMockClient(trip = createTripRecord()): TripApiClient {
   return {
+    createShareLink: vi.fn(async () => ({
+      token: "public-share-token-1234567890abcdef",
+      permission: "read_only" as const,
+      expiresAt: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z"
+    })),
     createTrip: vi.fn(async () => trip),
     generateItinerary: vi.fn(async () => ({
       itinerary: mockItinerary,
@@ -51,6 +59,16 @@ function createMockClient(trip = createTripRecord()): TripApiClient {
         repaired: false,
         tokenUsage: null
       }
+    })),
+    getSharedTrip: vi.fn(async () => ({
+      share: {
+        token: "public-share-token-1234567890abcdef",
+        permission: "read_only" as const,
+        expiresAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      },
+      trip
     })),
     getTrip: vi.fn(async () => trip),
     listTrips: vi.fn(async () => [trip]),
@@ -243,6 +261,18 @@ describe("trip API workflow helpers", () => {
 
     expect(client.getTrip).toHaveBeenCalledWith("trip-1");
     expect(result.itinerary.title).toBe("Reopened spring route");
+  });
+
+  test("creates read-only share links through the API client", async () => {
+    const client = createMockClient();
+
+    const shareLink = await createShareLink(client, "trip-1");
+
+    expect(client.createShareLink).toHaveBeenCalledWith("trip-1");
+    expect(shareLink).toMatchObject({
+      token: "public-share-token-1234567890abcdef",
+      permission: "read_only"
+    });
   });
 
   test("formats API field errors for visible UI feedback", () => {

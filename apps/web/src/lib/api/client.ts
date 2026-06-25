@@ -5,6 +5,8 @@ import {
 import type { TripRequest } from "../../../../../packages/shared/src/schemas/tripRequest.js";
 import type {
   GenerateItineraryResponse,
+  ShareLinkRecord,
+  SharedTripRecord,
   TripRecord,
   TripWritePayload
 } from "./types.js";
@@ -39,10 +41,12 @@ export class TripApiClientError extends Error {
 }
 
 export type TripApiClient = {
+  createShareLink: (tripId: string) => Promise<ShareLinkRecord>;
   createTrip: (payload: TripWritePayload) => Promise<TripRecord>;
   generateItinerary: (
     payload: TripRequest
   ) => Promise<GenerateItineraryResponse>;
+  getSharedTrip: (shareToken: string) => Promise<SharedTripRecord>;
   getTrip: (tripId: string) => Promise<TripRecord>;
   listTrips: () => Promise<TripRecord[]>;
   updateTrip: (
@@ -138,6 +142,17 @@ export function createTripApiClient(
   }
 
   return {
+    async createShareLink(tripId) {
+      const response = await requestJson<{ share: ShareLinkRecord }>(
+        `/api/trips/${encodeURIComponent(tripId)}/share`,
+        {
+          method: "POST"
+        }
+      );
+
+      return response.share;
+    },
+
     async createTrip(payload) {
       const response = await requestJson<{ trip: TripRecord }>("/api/trips", {
         body: JSON.stringify(payload),
@@ -163,6 +178,12 @@ export function createTripApiClient(
       );
 
       return response.trip;
+    },
+
+    async getSharedTrip(shareToken) {
+      return requestJson<SharedTripRecord>(
+        `/api/share/${encodeURIComponent(shareToken)}`
+      );
     },
 
     async listTrips() {
