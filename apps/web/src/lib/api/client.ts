@@ -5,6 +5,8 @@ import {
 import type { TripRequest } from "../../../../../packages/shared/src/schemas/tripRequest.js";
 import type {
   GenerateItineraryResponse,
+  HotelSuggestionsRequest,
+  HotelSuggestionsResponse,
   PdfExportFile,
   ShareLinkRecord,
   SharedTripRecord,
@@ -49,6 +51,9 @@ export type TripApiClient = {
   generateItinerary: (
     payload: TripRequest
   ) => Promise<GenerateItineraryResponse>;
+  getHotelSuggestions: (
+    payload: HotelSuggestionsRequest
+  ) => Promise<HotelSuggestionsResponse>;
   getSharedTrip: (shareToken: string) => Promise<SharedTripRecord>;
   getTrip: (tripId: string) => Promise<TripRecord>;
   listTrips: () => Promise<TripRecord[]>;
@@ -216,6 +221,16 @@ export function createTripApiClient(
     async generateItinerary(payload) {
       return requestJson<GenerateItineraryResponse>(
         "/api/itineraries/generate",
+        {
+          body: JSON.stringify(payload),
+          method: "POST"
+        }
+      );
+    },
+
+    async getHotelSuggestions(payload) {
+      return requestJson<HotelSuggestionsResponse>(
+        "/api/enrichment/hotels/suggestions",
         {
           body: JSON.stringify(payload),
           method: "POST"

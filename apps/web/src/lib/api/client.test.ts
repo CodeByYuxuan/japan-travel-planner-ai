@@ -49,6 +49,39 @@ function pdfResponse(init: ResponseInit = {}) {
   });
 }
 
+function hotelSuggestionsResponse(init: ResponseInit = {}) {
+  return jsonResponse(
+    {
+      hotelSuggestions: [
+        {
+          access: "3 minutes from Tokyo Station",
+          address: "1 Marunouchi, Chiyoda City, Tokyo",
+          amenities: ["Wi-Fi"],
+          bookingUrl: "https://example.com/hotel",
+          city: "Tokyo",
+          currency: "JPY",
+          description: "Central hotel for rail-friendly days.",
+          id: "rakuten-travel:123456",
+          imageUrl: "https://example.com/hotel.jpg",
+          latitude: 35.6812,
+          longitude: 139.7671,
+          mapUrl: "https://www.google.com/maps/search/?api=1&query=Tokyo",
+          name: "Tokyo Station Stay",
+          priceFrom: 18000,
+          provider: "rakuten-travel",
+          rating: 4.5,
+          reviewCount: 321,
+          sourceUpdatedAt: null,
+          tags: ["Near Tokyo Station"],
+          thumbnailUrl: "https://example.com/thumb.jpg"
+        }
+      ],
+      status: "available"
+    },
+    init
+  );
+}
+
 describe("createTripApiClient", () => {
   test("creates trips with included anonymous session credentials", async () => {
     const trip = createTripRecord();
@@ -165,9 +198,9 @@ describe("createTripApiClient", () => {
       "http://localhost:3001/api/trips/trip-1/share",
       "http://localhost:3001/api/share/public-share-token-1234567890abcdef"
     ]);
-    expect(fetchMock.mock.calls.map(([, init]) => init?.method ?? "GET")).toEqual(
-      ["GET", "GET", "PATCH", "POST", "GET"]
-    );
+    expect(
+      fetchMock.mock.calls.map(([, init]) => init?.method ?? "GET")
+    ).toEqual(["GET", "GET", "PATCH", "POST", "GET"]);
     expect(
       fetchMock.mock.calls.every(([, init]) => init?.credentials === "include")
     ).toBe(true);
@@ -262,6 +295,59 @@ describe("createTripApiClient", () => {
         new Headers(init?.headers).get("Accept")?.includes("application/pdf")
       )
     ).toBe(true);
+  });
+
+  test("requests normalized hotel suggestions through the API", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return hotelSuggestionsResponse();
+      }
+    );
+    const client = createTripApiClient({
+      baseUrl: "http://localhost:3001",
+      fetch: fetchMock
+    });
+
+    await expect(
+      client.getHotelSuggestions({
+        budget: "moderate",
+        city: "Tokyo",
+        endDate: "2026-04-08",
+        startDate: "2026-04-06"
+      })
+    ).resolves.toMatchObject({
+      hotelSuggestions: [
+        {
+          id: "rakuten-travel:123456",
+          name: "Tokyo Station Stay",
+          provider: "rakuten-travel"
+        }
+      ],
+      status: "available"
+    });
+
+    const firstCall = fetchMock.mock.calls[0];
+
+    if (!firstCall) {
+      throw new Error("Expected fetch to be called");
+    }
+
+    const [url, init] = firstCall;
+
+    expect(url).toBe("http://localhost:3001/api/enrichment/hotels/suggestions");
+    expect(init).toMatchObject({
+      credentials: "include",
+      method: "POST"
+    });
+    expect(new Headers(init?.headers).get("Accept")).toContain(
+      "application/json"
+    );
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      budget: "moderate",
+      city: "Tokyo"
+    });
   });
 
   test("parses structured API errors for UI display", async () => {

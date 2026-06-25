@@ -9,6 +9,31 @@ const corsHeaders = {
 
 const publicShareToken = "public-share-token-1234567890abcdef";
 const pdfBody = "%PDF-1.4\nMock itinerary PDF";
+const hotelSuggestionsFixture = [
+  {
+    access: "3 minutes walk from Tokyo Station.",
+    address: "Tokyo Chiyoda City Marunouchi 1-1-1",
+    amenities: ["Wi-Fi", "Large bath"],
+    bookingUrl: "https://travel.rakuten.co.jp/plan-list",
+    city: "Tokyo",
+    currency: "JPY",
+    description: "A convenient base for rail-friendly Tokyo days.",
+    id: "rakuten-travel:123456",
+    imageUrl: "https://img.travel.rakuten.co.jp/hotel.jpg",
+    latitude: 35.6812,
+    longitude: 139.7671,
+    mapUrl:
+      "https://www.google.com/maps/search/?api=1&query=35.6812%2C139.7671",
+    name: "Tokyo Station Stay",
+    priceFrom: 18000,
+    provider: "rakuten-travel",
+    rating: 4.5,
+    reviewCount: 321,
+    sourceUpdatedAt: null,
+    tags: ["Near Tokyo Station"],
+    thumbnailUrl: "https://img.travel.rakuten.co.jp/thumb.jpg"
+  }
+];
 
 const generatedItineraryFixture = {
   title: "AI Generated Tokyo And Kyoto Route",
@@ -133,6 +158,39 @@ async function routeGeneratedItinerary(page: Page) {
       status: 200
     });
   });
+}
+
+async function routeHotelSuggestions(page: Page) {
+  let hotelSuggestionRequests = 0;
+
+  await page.route("**/api/enrichment/hotels/suggestions", async (route) => {
+    if (isOptionsRequest(route)) {
+      await fulfillOptions(route);
+      return;
+    }
+
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toMatchObject({
+      budget: "moderate",
+      city: "Tokyo",
+      startDate: "2026-04-06"
+    });
+    hotelSuggestionRequests += 1;
+
+    await route.fulfill({
+      contentType: "application/json",
+      headers: corsHeaders,
+      json: {
+        hotelSuggestions: hotelSuggestionsFixture,
+        status: "available"
+      },
+      status: 200
+    });
+  });
+
+  return {
+    getHotelSuggestionRequests: () => hotelSuggestionRequests
+  };
 }
 
 async function fillGeneratedTripRequest(page: Page) {
@@ -263,45 +321,48 @@ async function routeTripPersistence(
     });
   });
 
-  await page.route("**/api/trips/generated-trip-1/export/pdf", async (route) => {
-    if (isOptionsRequest(route)) {
-      await fulfillOptions(route);
-      return;
-    }
+  await page.route(
+    "**/api/trips/generated-trip-1/export/pdf",
+    async (route) => {
+      if (isOptionsRequest(route)) {
+        await fulfillOptions(route);
+        return;
+      }
 
-    expect(route.request().method()).toBe("GET");
-    privatePdfExportRequests += 1;
+      expect(route.request().method()).toBe("GET");
+      privatePdfExportRequests += 1;
 
-    if (
-      options.failFirstPrivateExport === true &&
-      privatePdfExportRequests === 1
-    ) {
+      if (
+        options.failFirstPrivateExport === true &&
+        privatePdfExportRequests === 1
+      ) {
+        await route.fulfill({
+          contentType: "application/json",
+          headers: corsHeaders,
+          json: {
+            error: {
+              code: "PDF_EXPORT_FAILED",
+              message: "PDF export could not be generated."
+            }
+          },
+          status: 500
+        });
+        return;
+      }
+
       await route.fulfill({
-        contentType: "application/json",
-        headers: corsHeaders,
-        json: {
-          error: {
-            code: "PDF_EXPORT_FAILED",
-            message: "PDF export could not be generated."
-          }
+        body: pdfBody,
+        contentType: "application/pdf",
+        headers: {
+          ...corsHeaders,
+          "cache-control": "no-store",
+          "content-disposition":
+            'attachment; filename="ai-generated-tokyo-and-kyoto-route.pdf"'
         },
-        status: 500
+        status: 200
       });
-      return;
     }
-
-    await route.fulfill({
-      body: pdfBody,
-      contentType: "application/pdf",
-      headers: {
-        ...corsHeaders,
-        "cache-control": "no-store",
-        "content-disposition":
-          'attachment; filename="ai-generated-tokyo-and-kyoto-route.pdf"'
-      },
-      status: 200
-    });
-  });
+  );
 
   await page.route("**/api/trips/generated-trip-1/share", async (route) => {
     if (isOptionsRequest(route)) {
@@ -494,15 +555,16 @@ test("traveler can plan and edit a mock itinerary", async ({ page }) => {
   await expect(
     dayOne.getByRole("heading", { name: "Morning walk through Ueno Park" })
   ).toBeVisible();
-  await expect(
-    dayOne.getByRole("heading", { name: editedTitle })
-  ).toHaveCount(0);
+  await expect(dayOne.getByRole("heading", { name: editedTitle })).toHaveCount(
+    0
+  );
 });
 
 test("traveler can generate and edit an itinerary from a mocked AI API response", async ({
   page
 }) => {
   await routeGeneratedItinerary(page);
+  const hotels = await routeHotelSuggestions(page);
 
   await page.goto("/");
   await page.getByRole("button", { name: "API" }).click();
@@ -533,6 +595,11 @@ test("traveler can generate and edit an itinerary from a mocked AI API response"
   await expect(
     page.getByRole("button", { name: "Save itinerary" })
   ).toBeEnabled();
+  await page.getByRole("button", { name: "Find hotels" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Tokyo Station Stay" })
+  ).toBeVisible();
+  await expect.poll(() => hotels.getHotelSuggestionRequests()).toBe(1);
 
   await page
     .getByRole("button", { name: "Edit Generated Senso-ji morning" })
@@ -681,8 +748,9 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
     throw new Error("Expected reopened itinerary edits to be patched.");
   }
 
-  expect(patchedPayload.days[0]?.activities.map((activity) => activity.title))
-    .toEqual(["Generated Asakusa lunch", patchedEditedTitle]);
+  expect(
+    patchedPayload.days[0]?.activities.map((activity) => activity.title)
+  ).toEqual(["Generated Asakusa lunch", patchedEditedTitle]);
 
   await page.reload();
   await page.getByRole("button", { name: "API" }).click();
@@ -696,17 +764,13 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
     patchedEditedTitle
   ]);
 
-  await expect(
-    page.getByRole("button", { name: "Export PDF" })
-  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Export PDF" })).toBeEnabled();
   await page.getByRole("button", { name: "Export PDF" }).click();
   await expect(
     page.getByRole("alert").getByText("PDF export could not be generated.")
   ).toBeVisible();
   await page.getByRole("button", { name: "Export PDF" }).click();
-  await expect
-    .poll(() => persistence.getPrivatePdfExportRequests())
-    .toBe(2);
+  await expect.poll(() => persistence.getPrivatePdfExportRequests()).toBe(2);
 
   await page.getByRole("button", { name: "Create public link" }).click();
   expect(persistence.getShareCreatedForTripId()).toBe("generated-trip-1");
@@ -740,9 +804,7 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
     page.getByRole("button", { name: "Export shared PDF" })
   ).toBeEnabled();
   await page.getByRole("button", { name: "Export shared PDF" }).click();
-  await expect
-    .poll(() => persistence.getSharedPdfExportRequests())
-    .toBe(1);
+  await expect.poll(() => persistence.getSharedPdfExportRequests()).toBe(1);
   await expect(page.getByRole("button", { name: /Edit/ })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Save itinerary" })
@@ -753,9 +815,9 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
   await expect(
     page.getByRole("button", { name: "Generate AI itinerary" })
   ).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Save and reopen" })).toHaveCount(
-    0
-  );
+  await expect(
+    page.getByRole("region", { name: "Save and reopen" })
+  ).toHaveCount(0);
 
   await page.goto("/share/invalid-public-share-token-1234567890");
   await expect(

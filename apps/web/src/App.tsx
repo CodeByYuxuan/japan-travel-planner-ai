@@ -7,6 +7,10 @@ import {
   downloadPdfFile,
   ExportControls
 } from "./features/export/ExportControls.js";
+import {
+  HotelSuggestions,
+  type HotelSuggestionsStatus
+} from "./features/hotels/HotelSuggestions.js";
 import { ItineraryView } from "./features/itinerary/ItineraryView.js";
 import {
   cloneItinerary,
@@ -22,6 +26,7 @@ import {
   type TripDataMode
 } from "./features/trips/useTrips.js";
 import { createTripApiClient } from "./lib/api/client.js";
+import type { HotelSuggestion } from "./lib/api/types.js";
 import { mockItinerary } from "./mocks/index.js";
 import { SharedTripPage } from "./routes/SharedTripPage.js";
 
@@ -69,6 +74,14 @@ export function App() {
   const [exportErrorMessage, setExportErrorMessage] = useState<string | null>(
     null
   );
+  const [hotelSuggestions, setHotelSuggestions] = useState<HotelSuggestion[]>(
+    []
+  );
+  const [hotelSuggestionsError, setHotelSuggestionsError] = useState<
+    string | null
+  >(null);
+  const [hotelSuggestionsStatus, setHotelSuggestionsStatus] =
+    useState<HotelSuggestionsStatus>("idle");
   const tripApiClient = useMemo(() => createTripApiClient(), []);
   const generatedItinerary = useGeneratedItinerary();
   const itineraryEditor = useItineraryEditor(null);
@@ -90,6 +103,14 @@ export function App() {
   const selectedShareLink = trips.selectedTripId
     ? trips.shareLinksByTripId[trips.selectedTripId]
     : undefined;
+  const hotelTargetCity =
+    itinerary?.days[0]?.city ?? activeRequest?.cities[0] ?? null;
+  const hotelDisabledReason =
+    !itinerary || !activeRequest || !hotelTargetCity
+      ? "Create an itinerary before searching hotels."
+      : isSubmitting
+        ? "Wait for the itinerary to finish before searching hotels."
+        : undefined;
   const shareDisabledReason =
     dataMode === "mock"
       ? "Switch to API mode and save the trip before sharing."
@@ -139,9 +160,9 @@ export function App() {
           ? "Mock mode"
           : trips.status === "error" && itineraryEditor.isDirty
             ? "Retry needed"
-          : trips.status === "saved"
-            ? "Saved"
-            : "API ready",
+            : trips.status === "saved"
+              ? "Saved"
+              : "API ready",
       detail: "Anonymous session cookies, saved trips, and reopen controls"
     }
   ];
@@ -152,10 +173,17 @@ export function App() {
     );
   }
 
+  function resetHotelSuggestions() {
+    setHotelSuggestions([]);
+    setHotelSuggestionsError(null);
+    setHotelSuggestionsStatus("idle");
+  }
+
   function handleMockSubmit(request: TripRequest) {
     setActiveRequest(request);
     setLocalError(null);
     setExportErrorMessage(null);
+    resetHotelSuggestions();
     trips.clearError();
     generatedItinerary.clearError();
     setIsMockSubmitting(true);
@@ -177,6 +205,7 @@ export function App() {
     setActiveRequest(request);
     setLocalError(null);
     setExportErrorMessage(null);
+    resetHotelSuggestions();
     trips.clearError();
     generatedItinerary.clearError();
     resetToItinerary(null);
@@ -203,6 +232,7 @@ export function App() {
 
     setLocalError(null);
     setExportErrorMessage(null);
+    setHotelSuggestionsError(null);
     generatedItinerary.clearError();
 
     const result = await trips.saveTrip(
@@ -221,6 +251,7 @@ export function App() {
     itineraryEditor.revertItinerary();
     setLocalError(null);
     setExportErrorMessage(null);
+    setHotelSuggestionsError(null);
     trips.clearError();
     generatedItinerary.clearError();
   }
@@ -233,6 +264,7 @@ export function App() {
 
     setLocalError(null);
     setExportErrorMessage(null);
+    resetHotelSuggestions();
     generatedItinerary.clearError();
 
     const result = await trips.reopenTrip(trips.selectedTripId);
@@ -246,8 +278,39 @@ export function App() {
   async function handleLoadSavedTrips() {
     setLocalError(null);
     setExportErrorMessage(null);
+    setHotelSuggestionsError(null);
     generatedItinerary.clearError();
     await trips.loadSavedTrips();
+  }
+
+  async function handleLoadHotelSuggestions() {
+    if (!activeRequest || !hotelTargetCity) {
+      setHotelSuggestions([]);
+      setHotelSuggestionsError("Create an itinerary before searching hotels.");
+      setHotelSuggestionsStatus("error");
+      return;
+    }
+
+    setHotelSuggestions([]);
+    setHotelSuggestionsError(null);
+    setHotelSuggestionsStatus("loading");
+
+    try {
+      const result = await tripApiClient.getHotelSuggestions({
+        budget: activeRequest.budget,
+        city: hotelTargetCity,
+        endDate: activeRequest.endDate,
+        maxResults: 3,
+        startDate: activeRequest.startDate
+      });
+
+      setHotelSuggestions(result.hotelSuggestions);
+      setHotelSuggestionsStatus(result.status);
+    } catch (error) {
+      setHotelSuggestions([]);
+      setHotelSuggestionsError(getTripErrorMessage(error));
+      setHotelSuggestionsStatus("error");
+    }
   }
 
   async function handleExportPdf() {
@@ -278,6 +341,7 @@ export function App() {
 
     setLocalError(null);
     setExportErrorMessage(null);
+    setHotelSuggestionsError(null);
     generatedItinerary.clearError();
     await trips.createShareLink(trips.selectedTripId);
   }
@@ -286,6 +350,7 @@ export function App() {
     setDataMode(nextMode);
     setLocalError(null);
     setExportErrorMessage(null);
+    resetHotelSuggestions();
     trips.clearError();
     generatedItinerary.clearError();
   }
@@ -406,13 +471,13 @@ export function App() {
                       ? "Working"
                       : trips.status === "error" && itineraryEditor.isDirty
                         ? "Retry or revert local edits"
-                      : trips.status === "saved"
-                        ? "Saved"
-                        : itineraryEditor.isDirty
-                          ? "Local edits pending"
-                          : dataMode === "mock"
-                            ? "Mock mode"
-                            : "Ready"}
+                        : trips.status === "saved"
+                          ? "Saved"
+                          : itineraryEditor.isDirty
+                            ? "Local edits pending"
+                            : dataMode === "mock"
+                              ? "Mock mode"
+                              : "Ready"}
               </p>
 
               {storageMessage ? (
@@ -479,6 +544,15 @@ export function App() {
                 errorMessage={exportErrorMessage}
                 isExporting={isExportingPdf}
                 onExportPdf={handleExportPdf}
+              />
+
+              <HotelSuggestions
+                disabledReason={hotelDisabledReason}
+                errorMessage={hotelSuggestionsError}
+                onLoadSuggestions={handleLoadHotelSuggestions}
+                status={hotelSuggestionsStatus}
+                suggestions={hotelSuggestions}
+                targetCity={hotelTargetCity}
               />
 
               <ShareControls

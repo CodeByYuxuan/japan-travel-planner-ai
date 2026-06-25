@@ -15,6 +15,8 @@ describe("loadApiEnv", () => {
         API_PORT: "4001",
         OPENAI_API_KEY: "sk-test-api-key",
         OPENAI_MODEL: "gpt-test-model",
+        RAKUTEN_ACCESS_KEY: "rakuten-access-key",
+        RAKUTEN_APP_ID: "rakuten-app-id",
         WEATHER_API_KEY: "weather-test-key",
         WEB_ORIGIN: "https://planner.example.com",
         JWT_SECRET: "test-session-secret-value"
@@ -25,6 +27,8 @@ describe("loadApiEnv", () => {
       apiPort: 4001,
       openAiApiKey: "sk-test-api-key",
       openAiModel: "gpt-test-model",
+      rakutenAccessKey: "rakuten-access-key",
+      rakutenAppId: "rakuten-app-id",
       weatherApiKey: "weather-test-key",
       webOrigin: "https://planner.example.com",
       jwtSecret: "test-session-secret-value"
@@ -34,7 +38,21 @@ describe("loadApiEnv", () => {
   test("does not require provider keys during API env loading", () => {
     expect(loadApiEnv({}).openAiApiKey).toBeUndefined();
     expect(loadApiEnv({}).openAiModel).toBe(defaultApiEnv.openAiModel);
+    expect(loadApiEnv({}).rakutenAccessKey).toBeUndefined();
+    expect(loadApiEnv({}).rakutenAppId).toBeUndefined();
     expect(loadApiEnv({}).weatherApiKey).toBeUndefined();
+  });
+
+  test("supports legacy RAKUTEN_API_KEY as the Rakuten app ID alias", () => {
+    expect(
+      loadApiEnv({
+        RAKUTEN_ACCESS_KEY: "rakuten-access-key",
+        RAKUTEN_API_KEY: "legacy-rakuten-app-id"
+      })
+    ).toMatchObject({
+      rakutenAccessKey: "rakuten-access-key",
+      rakutenAppId: "legacy-rakuten-app-id"
+    });
   });
 
   test("fails clearly for invalid API_PORT", () => {
