@@ -58,6 +58,52 @@ export type PdfExportFile = {
   filename: string;
 };
 
+export type HotelSearchBudget = "budget" | "moderate" | "luxury";
+
+export type HotelSuggestionsRequest = {
+  budget?: HotelSearchBudget | undefined;
+  city: string;
+  endDate: string;
+  latitude?: number | undefined;
+  longitude?: number | undefined;
+  maxResults?: number | undefined;
+  radiusKm?: number | undefined;
+  startDate: string;
+};
+
+export type HotelSuggestion = {
+  access: string | null;
+  address: string | null;
+  amenities: string[];
+  bookingUrl: string | null;
+  city: string;
+  currency: "JPY" | string;
+  description: string | null;
+  id: string;
+  imageUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  mapUrl: string | null;
+  name: string;
+  priceFrom: number | null;
+  provider: string;
+  rating: number | null;
+  reviewCount: number | null;
+  sourceUpdatedAt: string | null;
+  tags: string[];
+  thumbnailUrl: string | null;
+};
+
+export type HotelSuggestionsResponse =
+  | {
+      hotelSuggestions: HotelSuggestion[];
+      status: "available";
+    }
+  | {
+      hotelSuggestions: HotelSuggestion[];
+      status: "empty" | "unavailable";
+    };
+
 export function tripRecordToItinerary(trip: TripRecord): Itinerary {
   return {
     title: trip.title,

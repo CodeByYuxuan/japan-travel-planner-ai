@@ -5,6 +5,8 @@ import { loadApiEnv, type ApiEnvConfig } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { createRateLimitMiddleware } from "./middleware/rateLimit.js";
 import { createSessionMiddleware } from "./middleware/session.js";
+import type { HotelProvider } from "./providers/hotels/hotelProvider.js";
+import { createRakutenHotelProvider } from "./providers/hotels/rakutenHotelProvider.js";
 import {
   createGoogleMapsProvider,
   type MapsProvider
@@ -35,7 +37,10 @@ import {
   createPdfExportService,
   type PdfExportService
 } from "./services/pdfExportService.js";
-import { createShareService, type ShareService } from "./services/shareService.js";
+import {
+  createShareService,
+  type ShareService
+} from "./services/shareService.js";
 import { createTripService, type TripService } from "./services/tripService.js";
 
 export type CreateAppOptions = {
@@ -43,6 +48,7 @@ export type CreateAppOptions = {
   aiGenerationRateLimitMiddleware?: RequestHandler;
   aiItineraryService?: AiItineraryService;
   aiUsageLogger?: AiUsageLogger;
+  hotelProvider?: HotelProvider;
   mapsProvider?: MapsProvider;
   pdfExportService?: PdfExportService;
   providerResultCache?: ProviderResultCache;
@@ -83,9 +89,14 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   const tripService = options.tripService ?? createTripService();
   const shareService = options.shareService ?? createShareService();
-  const pdfExportService =
-    options.pdfExportService ?? createPdfExportService();
+  const pdfExportService = options.pdfExportService ?? createPdfExportService();
   const mapsProvider = options.mapsProvider ?? createGoogleMapsProvider();
+  const hotelProvider =
+    options.hotelProvider ??
+    createRakutenHotelProvider({
+      accessKey: env.rakutenAccessKey,
+      appId: env.rakutenAppId
+    });
   const providerResultCache =
     options.providerResultCache ?? createProviderResultCache();
   const weatherProvider =
@@ -106,6 +117,7 @@ export function createApp(options: CreateAppOptions = {}) {
   app.use(
     "/api/enrichment",
     createEnrichmentRouter({
+      hotelProvider,
       mapsProvider,
       providerResultCache,
       weatherProvider

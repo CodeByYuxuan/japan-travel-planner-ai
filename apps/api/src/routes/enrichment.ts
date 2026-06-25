@@ -3,12 +3,17 @@ import { z } from "zod";
 
 import { ApiError } from "../errors/ApiError.js";
 import { validateRequest } from "../middleware/validateRequest.js";
+import {
+  HotelProviderConfigurationError,
+  type HotelProvider
+} from "../providers/hotels/hotelProvider.js";
 import type { MapsProvider } from "../providers/maps/mapsProvider.js";
 import {
   WeatherProviderConfigurationError,
   type WeatherProvider
 } from "../providers/weather/weatherProvider.js";
 import type { ProviderResultCache } from "../services/enrichment/cache.js";
+import { createCachedHotelSuggestions } from "../services/enrichment/hotelEnrichment.js";
 import { createCachedMapLink } from "../services/enrichment/mapEnrichment.js";
 import { createCachedWeatherSummary } from "../services/enrichment/weatherEnrichment.js";
 
@@ -66,6 +71,43 @@ const weatherSummaryBodySchema = z
     }
   });
 
+const hotelSuggestionsBodySchema = z
+  .object({
+    budget: z.enum(["budget", "moderate", "luxury"]).optional(),
+    city: z.string().trim().min(1),
+    endDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a YYYY-MM-DD date."),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
+    maxResults: z.number().int().min(1).max(30).default(6),
+    radiusKm: z.number().min(0.1).max(3).default(2),
+    startDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a YYYY-MM-DD date.")
+  })
+  .strict()
+  .superRefine((body, context) => {
+    const hasLatitude = body.latitude !== undefined;
+    const hasLongitude = body.longitude !== undefined;
+
+    if (hasLatitude !== hasLongitude) {
+      context.addIssue({
+        code: "custom",
+        message: "Provide both latitude and longitude.",
+        path: hasLatitude ? ["longitude"] : ["latitude"]
+      });
+    }
+
+    if (body.startDate > body.endDate) {
+      context.addIssue({
+        code: "custom",
+        message: "endDate must be on or after startDate.",
+        path: ["endDate"]
+      });
+    }
+  });
+
 function asyncHandler(handler: RequestHandler): RequestHandler {
   return (request, response, next) => {
     Promise.resolve(handler(request, response, next)).catch(next);
@@ -73,11 +115,38 @@ function asyncHandler(handler: RequestHandler): RequestHandler {
 }
 
 export function createEnrichmentRouter(options: {
+  hotelProvider: HotelProvider;
   mapsProvider: MapsProvider;
   providerResultCache: ProviderResultCache;
   weatherProvider: WeatherProvider;
 }) {
   const router = Router();
+
+  router.post(
+    "/hotels/suggestions",
+    validateRequest(hotelSuggestionsBodySchema),
+    asyncHandler(async (request, response) => {
+      try {
+        const result = await createCachedHotelSuggestions(
+          request.body,
+          options.hotelProvider,
+          options.providerResultCache
+        );
+
+        response.status(200).json(result);
+      } catch (error) {
+        if (error instanceof HotelProviderConfigurationError) {
+          throw new ApiError({
+            code: "HOTEL_PROVIDER_CONFIGURATION_ERROR",
+            message: "Hotel enrichment is not configured.",
+            statusCode: 503
+          });
+        }
+
+        throw error;
+      }
+    })
+  );
 
   router.post(
     "/maps/link",

@@ -70,6 +70,10 @@ function createMockClient(trip = createTripRecord()): TripApiClient {
         tokenUsage: null
       }
     })),
+    getHotelSuggestions: vi.fn(async () => ({
+      hotelSuggestions: [],
+      status: "empty" as const
+    })),
     getSharedTrip: vi.fn(async () => ({
       share: {
         token: "public-share-token-1234567890abcdef",

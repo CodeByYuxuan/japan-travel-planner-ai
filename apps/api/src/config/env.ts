@@ -4,6 +4,8 @@ export type ApiEnvConfig = {
   apiPort: number;
   openAiApiKey: string | undefined;
   openAiModel: string;
+  rakutenAccessKey: string | undefined;
+  rakutenAppId: string | undefined;
   weatherApiKey: string | undefined;
   webOrigin: string;
   jwtSecret: string;
@@ -18,6 +20,8 @@ export const defaultApiEnv = {
   apiPort: 3001,
   openAiApiKey: undefined,
   openAiModel: defaultOpenAiModel,
+  rakutenAccessKey: undefined,
+  rakutenAppId: undefined,
   weatherApiKey: undefined,
   webOrigin: "http://localhost:5173",
   jwtSecret: localDevelopmentJwtSecret
@@ -29,6 +33,9 @@ type ApiEnvSource = {
   API_PORT?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
   OPENAI_MODEL?: string | undefined;
+  RAKUTEN_ACCESS_KEY?: string | undefined;
+  RAKUTEN_API_KEY?: string | undefined;
+  RAKUTEN_APP_ID?: string | undefined;
   WEATHER_API_KEY?: string | undefined;
   WEB_ORIGIN?: string | undefined;
   JWT_SECRET?: string | undefined;
@@ -97,10 +104,14 @@ function parseOpenAiApiKey(value: string | undefined) {
   return rawApiKey && rawApiKey.length > 0 ? rawApiKey : undefined;
 }
 
-function parseWeatherApiKey(value: string | undefined) {
-  const rawApiKey = value?.trim();
+function parseOptionalSecret(value: string | undefined) {
+  const rawValue = value?.trim();
 
-  return rawApiKey && rawApiKey.length > 0 ? rawApiKey : undefined;
+  return rawValue && rawValue.length > 0 ? rawValue : undefined;
+}
+
+function parseWeatherApiKey(value: string | undefined) {
+  return parseOptionalSecret(value);
 }
 
 function parseOpenAiModel(value: string | undefined) {
@@ -149,6 +160,10 @@ export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
     apiPort: parseApiPort(env.API_PORT),
     openAiApiKey: parseOpenAiApiKey(env.OPENAI_API_KEY),
     openAiModel: parseOpenAiModel(env.OPENAI_MODEL),
+    rakutenAccessKey: parseOptionalSecret(env.RAKUTEN_ACCESS_KEY),
+    rakutenAppId: parseOptionalSecret(
+      env.RAKUTEN_APP_ID ?? env.RAKUTEN_API_KEY
+    ),
     weatherApiKey: parseWeatherApiKey(env.WEATHER_API_KEY),
     webOrigin: parseWebOrigin(env.WEB_ORIGIN),
     jwtSecret: parseJwtSecret(env.JWT_SECRET, env.NODE_ENV)

@@ -17,17 +17,19 @@ describe("App", () => {
     expect(html).toContain("Refresh saved trips");
     expect(html).toContain("PDF itinerary");
     expect(html).toContain("Save this itinerary before exporting a PDF.");
+    expect(html).toContain("Hotel suggestions");
+    expect(html).toContain("Create an itinerary before searching hotels.");
     expect(html).toContain("Read-only share link");
-    expect(html).toContain("Save this itinerary before creating a public share link.");
+    expect(html).toContain(
+      "Save this itinerary before creating a public share link."
+    );
     expect(html).toContain("No itinerary yet");
     expect(html).toContain("API");
   });
 
   test("parses public share route tokens without adding a router dependency", () => {
     expect(
-      getShareTokenFromPathname(
-        "/share/public-share-token-1234567890abcdef"
-      )
+      getShareTokenFromPathname("/share/public-share-token-1234567890abcdef")
     ).toBe("public-share-token-1234567890abcdef");
     expect(getShareTokenFromPathname("/")).toBeNull();
   });

@@ -5,6 +5,11 @@ import { apiErrorSchema } from "@japan-travel-planner/shared";
 
 import { createApp } from "../app.js";
 import { defaultApiEnv } from "../config/env.js";
+import {
+  HotelProviderError,
+  type HotelProvider,
+  type HotelSuggestion
+} from "../providers/hotels/hotelProvider.js";
 import type { MapsProvider } from "../providers/maps/mapsProvider.js";
 import {
   WeatherProviderError,
@@ -41,15 +46,21 @@ const weatherSummary = {
   windSpeedUnit: "meters_per_second"
 } satisfies WeatherSummary;
 
-function createEnrichmentTestApp(options: {
-  mapsProvider?: MapsProvider | undefined;
-  providerResultCache?: ProviderResultCache | undefined;
-  weatherProvider?: WeatherProvider | undefined;
-} = {}) {
+function createEnrichmentTestApp(
+  options: {
+    hotelProvider?: HotelProvider | undefined;
+    mapsProvider?: MapsProvider | undefined;
+    providerResultCache?: ProviderResultCache | undefined;
+    weatherProvider?: WeatherProvider | undefined;
+  } = {}
+) {
   return createApp({
     env: defaultApiEnv,
     providerResultCache:
       options.providerResultCache ?? createMemoryProviderResultCache(),
+    ...(options.hotelProvider !== undefined
+      ? { hotelProvider: options.hotelProvider }
+      : {}),
     ...(options.mapsProvider !== undefined
       ? { mapsProvider: options.mapsProvider }
       : {}),
@@ -98,6 +109,188 @@ class InMemoryProviderResultRepository implements ProviderResultRepository {
 function createMemoryProviderResultCache() {
   return createProviderResultCache(new InMemoryProviderResultRepository());
 }
+
+const hotelSuggestion = {
+  access: "3 minutes walk from Tokyo Station.",
+  address: "Tokyo Chiyoda City Marunouchi 1-1-1",
+  amenities: ["Wi-Fi", "Large bath"],
+  bookingUrl: "https://travel.rakuten.co.jp/plan-list",
+  city: "Tokyo",
+  currency: "JPY",
+  description: "A convenient base for rail-friendly Tokyo days.",
+  id: "rakuten-travel:123456",
+  imageUrl: "https://img.travel.rakuten.co.jp/hotel.jpg",
+  latitude: 35.6812,
+  longitude: 139.7671,
+  mapUrl: "https://www.google.com/maps/search/?api=1&query=35.6812%2C139.7671",
+  name: "Tokyo Station Stay",
+  priceFrom: 18000,
+  provider: "rakuten-travel",
+  rating: 4.5,
+  reviewCount: 321,
+  sourceUpdatedAt: null,
+  tags: ["Near Tokyo Station"],
+  thumbnailUrl: "https://img.travel.rakuten.co.jp/thumb.jpg"
+} satisfies HotelSuggestion;
+
+describe("POST /api/enrichment/hotels/suggestions", () => {
+  test("returns normalized hotel suggestions", async () => {
+    const hotelProvider = {
+      name: "test-hotel-provider",
+      searchHotels: vi.fn(async () => [hotelSuggestion])
+    } satisfies HotelProvider;
+    const response = await request(createEnrichmentTestApp({ hotelProvider }))
+      .post("/api/enrichment/hotels/suggestions")
+      .send({
+        budget: "moderate",
+        city: "Tokyo",
+        endDate: "2026-04-08",
+        startDate: "2026-04-06"
+      });
+
+    expect(response.status).toBe(200);
+    expect(hotelProvider.searchHotels).toHaveBeenCalledWith({
+      budget: "moderate",
+      city: "Tokyo",
+      endDate: "2026-04-08",
+      maxResults: 6,
+      radiusKm: 2,
+      startDate: "2026-04-06"
+    });
+    expect(response.body).toEqual({
+      hotelSuggestions: [hotelSuggestion],
+      status: "available"
+    });
+  });
+
+  test("returns structured validation errors for invalid hotel input", async () => {
+    const response = await request(
+      createEnrichmentTestApp({
+        hotelProvider: {
+          name: "test-hotel-provider",
+          searchHotels: vi.fn(async () => [hotelSuggestion])
+        }
+      })
+    )
+      .post("/api/enrichment/hotels/suggestions")
+      .send({
+        city: "",
+        endDate: "2026-04-06",
+        latitude: 35.6812,
+        startDate: "2026-04-08"
+      });
+
+    expect(response.status).toBe(400);
+    expect(apiErrorSchema.safeParse(response.body).success).toBe(true);
+    expect(response.body.error).toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Request validation failed."
+    });
+    expect(response.body.error.fieldErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "city"
+        }),
+        expect.objectContaining({
+          path: "endDate"
+        }),
+        expect.objectContaining({
+          path: "longitude"
+        })
+      ])
+    );
+  });
+
+  test("returns a structured missing config error when Rakuten config is absent", async () => {
+    const response = await request(createEnrichmentTestApp())
+      .post("/api/enrichment/hotels/suggestions")
+      .send({
+        city: "Tokyo",
+        endDate: "2026-04-08",
+        startDate: "2026-04-06"
+      });
+
+    expect(response.status).toBe(503);
+    expect(apiErrorSchema.safeParse(response.body).success).toBe(true);
+    expect(response.body.error).toEqual({
+      code: "HOTEL_PROVIDER_CONFIGURATION_ERROR",
+      message: "Hotel enrichment is not configured."
+    });
+  });
+
+  test("degrades provider failure to unavailable hotel suggestions", async () => {
+    const hotelProvider = {
+      name: "test-hotel-provider",
+      searchHotels: vi.fn(async () => {
+        throw new HotelProviderError();
+      })
+    } satisfies HotelProvider;
+    const response = await request(createEnrichmentTestApp({ hotelProvider }))
+      .post("/api/enrichment/hotels/suggestions")
+      .send({
+        city: "Tokyo",
+        endDate: "2026-04-08",
+        startDate: "2026-04-06"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      hotelSuggestions: [],
+      status: "unavailable"
+    });
+  });
+
+  test("returns empty hotel suggestions when provider has no matches", async () => {
+    const hotelProvider = {
+      name: "test-hotel-provider",
+      searchHotels: vi.fn(async () => [])
+    } satisfies HotelProvider;
+    const response = await request(createEnrichmentTestApp({ hotelProvider }))
+      .post("/api/enrichment/hotels/suggestions")
+      .send({
+        city: "Unknown City",
+        endDate: "2026-04-08",
+        startDate: "2026-04-06"
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      hotelSuggestions: [],
+      status: "empty"
+    });
+  });
+
+  test("uses cached hotels for a second identical enrichment request", async () => {
+    const hotelProvider = {
+      name: "test-hotel-provider",
+      searchHotels: vi.fn(async () => [hotelSuggestion])
+    } satisfies HotelProvider;
+    const app = createEnrichmentTestApp({ hotelProvider });
+    const payload = {
+      city: "Tokyo",
+      endDate: "2026-04-08",
+      startDate: "2026-04-06"
+    };
+
+    const firstResponse = await request(app)
+      .post("/api/enrichment/hotels/suggestions")
+      .send(payload);
+    const secondResponse = await request(app)
+      .post("/api/enrichment/hotels/suggestions")
+      .send({
+        city: "  tokyo ",
+        endDate: "2026-04-08",
+        maxResults: 6,
+        radiusKm: 2,
+        startDate: "2026-04-06"
+      });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.body).toEqual(firstResponse.body);
+    expect(hotelProvider.searchHotels).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("POST /api/enrichment/maps/link", () => {
   test("returns an external Google Maps search link", async () => {
@@ -165,9 +358,7 @@ describe("POST /api/enrichment/maps/link", () => {
         throw new Error("provider unavailable");
       })
     } satisfies MapsProvider;
-    const response = await request(
-      createEnrichmentTestApp({ mapsProvider })
-    )
+    const response = await request(createEnrichmentTestApp({ mapsProvider }))
       .post("/api/enrichment/maps/link")
       .send({
         title: "Senso-ji morning visit",
@@ -189,9 +380,7 @@ describe("POST /api/enrichment/weather/summary", () => {
     const weatherProvider = {
       getDailySummary: vi.fn(async () => weatherSummary)
     } satisfies WeatherProvider;
-    const response = await request(
-      createEnrichmentTestApp({ weatherProvider })
-    )
+    const response = await request(createEnrichmentTestApp({ weatherProvider }))
       .post("/api/enrichment/weather/summary")
       .send({
         city: "Tokyo",
@@ -234,9 +423,7 @@ describe("POST /api/enrichment/weather/summary", () => {
         throw new WeatherProviderError();
       })
     } satisfies WeatherProvider;
-    const response = await request(
-      createEnrichmentTestApp({ weatherProvider })
-    )
+    const response = await request(createEnrichmentTestApp({ weatherProvider }))
       .post("/api/enrichment/weather/summary")
       .send({
         date: "2026-04-06",
@@ -255,9 +442,7 @@ describe("POST /api/enrichment/weather/summary", () => {
     const weatherProvider = {
       getDailySummary: vi.fn(async () => null)
     } satisfies WeatherProvider;
-    const response = await request(
-      createEnrichmentTestApp({ weatherProvider })
-    )
+    const response = await request(createEnrichmentTestApp({ weatherProvider }))
       .post("/api/enrichment/weather/summary")
       .send({
         city: "Unknown Place",
