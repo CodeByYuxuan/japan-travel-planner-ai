@@ -8,6 +8,8 @@ import type {
   CreateTripInput,
   UpdateTripInput
 } from "../repositories/tripRepository.js";
+import { sendPdfExportResponse } from "./export.js";
+import type { PdfExportService } from "../services/pdfExportService.js";
 import type { ShareService } from "../services/shareService.js";
 import type { TripService } from "../services/tripService.js";
 
@@ -144,7 +146,8 @@ function getTripId(value: string | string[] | undefined) {
 
 export function createTripsRouter(
   tripService: TripService,
-  shareService: ShareService
+  shareService: ShareService,
+  pdfExportService: PdfExportService
 ) {
   const router = Router();
 
@@ -195,6 +198,20 @@ export function createTripsRouter(
       );
 
       response.status(result.reused ? 200 : 201).json({ share: result.share });
+    })
+  );
+
+  router.get(
+    "/:tripId/export/pdf",
+    asyncHandler(async (request, response) => {
+      const session = requireAnonymousSession(request);
+      const trip = await tripService.getTrip(
+        session.id,
+        getTripId(request.params.tripId)
+      );
+      const pdf = await pdfExportService.createTripPdf(trip);
+
+      sendPdfExportResponse(response, pdf);
     })
   );
 

@@ -8,6 +8,7 @@ const corsHeaders = {
 };
 
 const publicShareToken = "public-share-token-1234567890abcdef";
+const pdfBody = "%PDF-1.4\nMock itinerary PDF";
 
 const generatedItineraryFixture = {
   title: "AI Generated Tokyo And Kyoto Route",
@@ -170,10 +171,12 @@ function createTripRecordFromPayload(payload: TripWritePayload) {
 
 async function routeTripPersistence(
   page: Page,
-  options: { failFirstSave?: boolean } = {}
+  options: { failFirstPrivateExport?: boolean; failFirstSave?: boolean } = {}
 ) {
   let savedTrip: ReturnType<typeof createTripRecordFromPayload> | null = null;
   let shareCreatedForTripId: string | null = null;
+  let privatePdfExportRequests = 0;
+  let sharedPdfExportRequests = 0;
   let saveAttempts = 0;
   let lastSavedPayload: TripWritePayload | null = null;
   let lastUpdatedPayload: TripWritePayload | null = null;
@@ -260,6 +263,46 @@ async function routeTripPersistence(
     });
   });
 
+  await page.route("**/api/trips/generated-trip-1/export/pdf", async (route) => {
+    if (isOptionsRequest(route)) {
+      await fulfillOptions(route);
+      return;
+    }
+
+    expect(route.request().method()).toBe("GET");
+    privatePdfExportRequests += 1;
+
+    if (
+      options.failFirstPrivateExport === true &&
+      privatePdfExportRequests === 1
+    ) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: corsHeaders,
+        json: {
+          error: {
+            code: "PDF_EXPORT_FAILED",
+            message: "PDF export could not be generated."
+          }
+        },
+        status: 500
+      });
+      return;
+    }
+
+    await route.fulfill({
+      body: pdfBody,
+      contentType: "application/pdf",
+      headers: {
+        ...corsHeaders,
+        "cache-control": "no-store",
+        "content-disposition":
+          'attachment; filename="ai-generated-tokyo-and-kyoto-route.pdf"'
+      },
+      status: 200
+    });
+  });
+
   await page.route("**/api/trips/generated-trip-1/share", async (route) => {
     if (isOptionsRequest(route)) {
       await fulfillOptions(route);
@@ -284,6 +327,31 @@ async function routeTripPersistence(
       status: 201
     });
   });
+
+  await page.route(
+    `**/api/share/${publicShareToken}/export/pdf`,
+    async (route) => {
+      if (isOptionsRequest(route)) {
+        await fulfillOptions(route);
+        return;
+      }
+
+      expect(route.request().method()).toBe("GET");
+      sharedPdfExportRequests += 1;
+
+      await route.fulfill({
+        body: pdfBody,
+        contentType: "application/pdf",
+        headers: {
+          ...corsHeaders,
+          "cache-control": "no-store",
+          "content-disposition":
+            'attachment; filename="ai-generated-tokyo-and-kyoto-route.pdf"'
+        },
+        status: 200
+      });
+    }
+  );
 
   await page.route("**/api/share/*", async (route) => {
     if (isOptionsRequest(route)) {
@@ -332,13 +400,16 @@ async function routeTripPersistence(
   return {
     getLastSavedPayload: () => lastSavedPayload,
     getLastUpdatedPayload: () => lastUpdatedPayload,
+    getPrivatePdfExportRequests: () => privatePdfExportRequests,
     getShareCreatedForTripId: () => shareCreatedForTripId,
+    getSharedPdfExportRequests: () => sharedPdfExportRequests,
     getSaveAttempts: () => saveAttempts
   };
 }
 
 test("traveler can plan and edit a mock itinerary", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { exact: true, name: "Mock" }).click();
 
   await expect(
     page.getByRole("heading", { name: "No itinerary yet" })
@@ -486,6 +557,7 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
 }) => {
   await routeGeneratedItinerary(page);
   const persistence = await routeTripPersistence(page, {
+    failFirstPrivateExport: true,
     failFirstSave: true
   });
 
@@ -624,6 +696,18 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
     patchedEditedTitle
   ]);
 
+  await expect(
+    page.getByRole("button", { name: "Export PDF" })
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  await expect(
+    page.getByRole("alert").getByText("PDF export could not be generated.")
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  await expect
+    .poll(() => persistence.getPrivatePdfExportRequests())
+    .toBe(2);
+
   await page.getByRole("button", { name: "Create public link" }).click();
   expect(persistence.getShareCreatedForTripId()).toBe("generated-trip-1");
 
@@ -652,6 +736,13 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
     "href",
     "https://www.google.com/maps/search/?api=1&query=Generated%20Asakusa%20lunch%20Asakusa%20Tokyo"
   );
+  await expect(
+    page.getByRole("button", { name: "Export shared PDF" })
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Export shared PDF" }).click();
+  await expect
+    .poll(() => persistence.getSharedPdfExportRequests())
+    .toBe(1);
   await expect(page.getByRole("button", { name: /Edit/ })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Save itinerary" })
@@ -670,4 +761,7 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
   await expect(
     page.getByRole("heading", { name: "Share link not available" })
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Export shared PDF" })
+  ).toHaveCount(0);
 });

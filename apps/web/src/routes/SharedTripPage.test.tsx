@@ -50,6 +50,7 @@ describe("SharedTripPage", () => {
     expect(html).toContain("Morning walk through Ueno Park");
     expect(html).toContain("Open in Google Maps");
     expect(html).toContain("Read-only");
+    expect(html).toContain("Export shared PDF");
     expect(html).not.toContain("Edit");
     expect(html).not.toContain("Delete");
     expect(html).not.toContain("Add activity");
@@ -70,6 +71,7 @@ describe("SharedTripPage", () => {
 
     expect(html).toContain("Share link not available");
     expect(html).toContain("Share link was not found.");
+    expect(html).not.toContain("Export shared PDF");
     expect(html).not.toContain("Save itinerary");
     expect(html).not.toContain("Generate AI itinerary");
   });

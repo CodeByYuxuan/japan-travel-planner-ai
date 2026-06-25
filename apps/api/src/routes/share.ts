@@ -1,6 +1,8 @@
 import { Router, type RequestHandler } from "express";
 
 import { ApiError } from "../errors/ApiError.js";
+import { sendPdfExportResponse } from "./export.js";
+import type { PdfExportService } from "../services/pdfExportService.js";
 import type { ShareService } from "../services/shareService.js";
 
 function asyncHandler(handler: RequestHandler): RequestHandler {
@@ -21,8 +23,23 @@ function getShareToken(value: string | string[] | undefined) {
   });
 }
 
-export function createShareRouter(shareService: ShareService) {
+export function createShareRouter(
+  shareService: ShareService,
+  pdfExportService: PdfExportService
+) {
   const router = Router();
+
+  router.get(
+    "/:shareToken/export/pdf",
+    asyncHandler(async (request, response) => {
+      const sharedTrip = await shareService.getSharedTrip(
+        getShareToken(request.params.shareToken)
+      );
+      const pdf = await pdfExportService.createTripPdf(sharedTrip.trip);
+
+      sendPdfExportResponse(response, pdf);
+    })
+  );
 
   router.get(
     "/:shareToken",

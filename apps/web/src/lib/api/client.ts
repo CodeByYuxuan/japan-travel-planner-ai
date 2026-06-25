@@ -5,6 +5,7 @@ import {
 import type { TripRequest } from "../../../../../packages/shared/src/schemas/tripRequest.js";
 import type {
   GenerateItineraryResponse,
+  PdfExportFile,
   ShareLinkRecord,
   SharedTripRecord,
   TripRecord,
@@ -43,6 +44,8 @@ export class TripApiClientError extends Error {
 export type TripApiClient = {
   createShareLink: (tripId: string) => Promise<ShareLinkRecord>;
   createTrip: (payload: TripWritePayload) => Promise<TripRecord>;
+  exportSharedTripPdf: (shareToken: string) => Promise<PdfExportFile>;
+  exportTripPdf: (tripId: string) => Promise<PdfExportFile>;
   generateItinerary: (
     payload: TripRequest
   ) => Promise<GenerateItineraryResponse>;
@@ -75,6 +78,12 @@ async function parseJsonResponse(response: Response) {
   } catch {
     return null;
   }
+}
+
+function getFilenameFromContentDisposition(value: string | null) {
+  const match = value?.match(/filename="([^"]+)"/i);
+
+  return match?.[1] ?? "itinerary.pdf";
 }
 
 function createApiError(response: Response, body: unknown) {
@@ -141,6 +150,38 @@ export function createTripApiClient(
     }
   }
 
+  async function requestBlob(path: string): Promise<PdfExportFile> {
+    try {
+      const response = await fetchImpl(joinUrl(baseUrl, path), {
+        credentials: "include",
+        headers: {
+          Accept: "application/pdf"
+        }
+      });
+
+      if (!response.ok) {
+        throw createApiError(response, await parseJsonResponse(response));
+      }
+
+      return {
+        blob: await response.blob(),
+        contentType: response.headers.get("Content-Type") ?? "application/pdf",
+        filename: getFilenameFromContentDisposition(
+          response.headers.get("Content-Disposition")
+        )
+      };
+    } catch (error) {
+      if (error instanceof TripApiClientError) {
+        throw error;
+      }
+
+      throw new TripApiClientError({
+        code: "TRIP_API_UNAVAILABLE",
+        message: `Could not reach the trip API at ${baseUrl}.`
+      });
+    }
+  }
+
   return {
     async createShareLink(tripId) {
       const response = await requestJson<{ share: ShareLinkRecord }>(
@@ -160,6 +201,16 @@ export function createTripApiClient(
       });
 
       return response.trip;
+    },
+
+    async exportSharedTripPdf(shareToken) {
+      return requestBlob(
+        `/api/share/${encodeURIComponent(shareToken)}/export/pdf`
+      );
+    },
+
+    async exportTripPdf(tripId) {
+      return requestBlob(`/api/trips/${encodeURIComponent(tripId)}/export/pdf`);
     },
 
     async generateItinerary(payload) {

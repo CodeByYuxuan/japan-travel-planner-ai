@@ -52,6 +52,12 @@ export type SharedTripRecord = {
   trip: TripRecord;
 };
 
+export type PdfExportFile = {
+  blob: Blob;
+  contentType: string;
+  filename: string;
+};
+
 export function tripRecordToItinerary(trip: TripRecord): Itinerary {
   return {
     title: trip.title,

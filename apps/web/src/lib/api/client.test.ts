@@ -39,6 +39,16 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
   });
 }
 
+function pdfResponse(init: ResponseInit = {}) {
+  return new Response(new Blob(["%PDF-1.4\nTest PDF"]), {
+    headers: {
+      "Content-Disposition": 'attachment; filename="test-itinerary.pdf"',
+      "Content-Type": "application/pdf"
+    },
+    ...init
+  });
+}
+
 describe("createTripApiClient", () => {
   test("creates trips with included anonymous session credentials", async () => {
     const trip = createTripRecord();
@@ -213,6 +223,45 @@ describe("createTripApiClient", () => {
       cities: mockTripRequest.cities,
       interests: mockTripRequest.interests
     });
+  });
+
+  test("exports private and shared trip PDFs through the API", async () => {
+    const responses = [pdfResponse(), pdfResponse()];
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return responses.shift() ?? pdfResponse();
+      }
+    );
+    const client = createTripApiClient({
+      baseUrl: "http://localhost:3001",
+      fetch: fetchMock
+    });
+
+    await expect(client.exportTripPdf("trip-1")).resolves.toMatchObject({
+      contentType: "application/pdf",
+      filename: "test-itinerary.pdf"
+    });
+    await expect(
+      client.exportSharedTripPdf("public-share-token-1234567890abcdef")
+    ).resolves.toMatchObject({
+      contentType: "application/pdf",
+      filename: "test-itinerary.pdf"
+    });
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "http://localhost:3001/api/trips/trip-1/export/pdf",
+      "http://localhost:3001/api/share/public-share-token-1234567890abcdef/export/pdf"
+    ]);
+    expect(
+      fetchMock.mock.calls.every(([, init]) => init?.credentials === "include")
+    ).toBe(true);
+    expect(
+      fetchMock.mock.calls.every(([, init]) =>
+        new Headers(init?.headers).get("Accept")?.includes("application/pdf")
+      )
+    ).toBe(true);
   });
 
   test("parses structured API errors for UI display", async () => {
