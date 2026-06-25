@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  downloadPdfFile,
+  ExportControls
+} from "../features/export/ExportControls.js";
 import { ItineraryView } from "../features/itinerary/ItineraryView.js";
 import {
   createTripApiClient,
@@ -45,6 +49,10 @@ export function SharedTripPage({
     initialSharedTrip ?? null
   );
   const [isLoading, setIsLoading] = useState(initialSharedTrip === undefined);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [exportErrorMessage, setExportErrorMessage] = useState<string | null>(
+    null
+  );
   const itinerary = sharedTrip ? tripRecordToItinerary(sharedTrip.trip) : null;
 
   useEffect(() => {
@@ -65,6 +73,7 @@ export function SharedTripPage({
         }
 
         setSharedTrip(nextSharedTrip);
+        setExportErrorMessage(null);
         setIsLoading(false);
       })
       .catch((error: unknown) => {
@@ -73,6 +82,7 @@ export function SharedTripPage({
         }
 
         setErrorMessage(getSharedTripErrorMessage(error));
+        setExportErrorMessage(null);
         setSharedTrip(null);
         setIsLoading(false);
       });
@@ -81,6 +91,21 @@ export function SharedTripPage({
       isActive = false;
     };
   }, [apiClient, initialSharedTrip, shareToken]);
+
+  async function handleExportSharedPdf() {
+    setExportErrorMessage(null);
+    setIsExportingPdf(true);
+
+    try {
+      const pdf = await apiClient.exportSharedTripPdf(shareToken);
+
+      downloadPdfFile(pdf);
+    } catch (error) {
+      setExportErrorMessage(getSharedTripErrorMessage(error));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }
 
   return (
     <div className="app-shell shared-app-shell">
@@ -124,7 +149,20 @@ export function SharedTripPage({
             <p>{errorMessage}</p>
           </section>
         ) : (
-          <ItineraryView itinerary={itinerary} isLoading={isLoading} />
+          <>
+            <ExportControls
+              disabledReason={
+                sharedTrip === null
+                  ? "Shared itinerary must load before exporting."
+                  : undefined
+              }
+              errorMessage={exportErrorMessage}
+              isExporting={isExportingPdf}
+              label="Export shared PDF"
+              onExportPdf={handleExportSharedPdf}
+            />
+            <ItineraryView itinerary={itinerary} isLoading={isLoading} />
+          </>
         )}
       </main>
     </div>

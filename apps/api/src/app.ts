@@ -31,6 +31,10 @@ import {
   createProviderResultCache,
   type ProviderResultCache
 } from "./services/enrichment/cache.js";
+import {
+  createPdfExportService,
+  type PdfExportService
+} from "./services/pdfExportService.js";
 import { createShareService, type ShareService } from "./services/shareService.js";
 import { createTripService, type TripService } from "./services/tripService.js";
 
@@ -40,6 +44,7 @@ export type CreateAppOptions = {
   aiItineraryService?: AiItineraryService;
   aiUsageLogger?: AiUsageLogger;
   mapsProvider?: MapsProvider;
+  pdfExportService?: PdfExportService;
   providerResultCache?: ProviderResultCache;
   sessionMiddleware?: RequestHandler;
   shareService?: ShareService;
@@ -78,6 +83,8 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   const tripService = options.tripService ?? createTripService();
   const shareService = options.shareService ?? createShareService();
+  const pdfExportService =
+    options.pdfExportService ?? createPdfExportService();
   const mapsProvider = options.mapsProvider ?? createGoogleMapsProvider();
   const providerResultCache =
     options.providerResultCache ?? createProviderResultCache();
@@ -111,11 +118,11 @@ export function createApp(options: CreateAppOptions = {}) {
       usageLogger: aiUsageLogger
     })
   );
-  app.use("/api/share", createShareRouter(shareService));
+  app.use("/api/share", createShareRouter(shareService, pdfExportService));
   app.use(
     "/api/trips",
     sessionMiddleware,
-    createTripsRouter(tripService, shareService)
+    createTripsRouter(tripService, shareService, pdfExportService)
   );
   app.use(errorHandler);
 

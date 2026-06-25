@@ -1,8 +1,12 @@
 import "./App.css";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { TripRequest } from "../../../packages/shared/src/schemas/tripRequest.js";
+import {
+  downloadPdfFile,
+  ExportControls
+} from "./features/export/ExportControls.js";
 import { ItineraryView } from "./features/itinerary/ItineraryView.js";
 import {
   cloneItinerary,
@@ -13,9 +17,11 @@ import { ShareControls } from "./features/sharing/ShareControls.js";
 import { TripIntakeForm } from "./features/trip-intake/index.js";
 import {
   getDefaultTripDataMode,
+  getTripErrorMessage,
   useTrips,
   type TripDataMode
 } from "./features/trips/useTrips.js";
+import { createTripApiClient } from "./lib/api/client.js";
 import { mockItinerary } from "./mocks/index.js";
 import { SharedTripPage } from "./routes/SharedTripPage.js";
 
@@ -59,6 +65,11 @@ export function App() {
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const [isMockSubmitting, setIsMockSubmitting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [exportErrorMessage, setExportErrorMessage] = useState<string | null>(
+    null
+  );
+  const tripApiClient = useMemo(() => createTripApiClient(), []);
   const generatedItinerary = useGeneratedItinerary();
   const itineraryEditor = useItineraryEditor(null);
   const itinerary = itineraryEditor.itinerary;
@@ -87,6 +98,16 @@ export function App() {
         : itineraryEditor.isDirty
           ? "Save local edits before sharing the itinerary."
           : undefined;
+  const exportDisabledReason =
+    dataMode === "mock"
+      ? "Switch to API mode and save the trip before exporting."
+      : apiBusy
+        ? "Wait for the current trip operation to finish before exporting."
+        : !trips.selectedTripId
+          ? "Save this itinerary before exporting a PDF."
+          : itineraryEditor.isDirty
+            ? "Save local edits before exporting the itinerary."
+            : undefined;
 
   if (shareToken !== null) {
     return <SharedTripPage shareToken={shareToken} />;
@@ -134,6 +155,7 @@ export function App() {
   function handleMockSubmit(request: TripRequest) {
     setActiveRequest(request);
     setLocalError(null);
+    setExportErrorMessage(null);
     trips.clearError();
     generatedItinerary.clearError();
     setIsMockSubmitting(true);
@@ -154,6 +176,7 @@ export function App() {
 
     setActiveRequest(request);
     setLocalError(null);
+    setExportErrorMessage(null);
     trips.clearError();
     generatedItinerary.clearError();
     resetToItinerary(null);
@@ -179,6 +202,7 @@ export function App() {
     }
 
     setLocalError(null);
+    setExportErrorMessage(null);
     generatedItinerary.clearError();
 
     const result = await trips.saveTrip(
@@ -196,6 +220,7 @@ export function App() {
   function handleRevertItinerary() {
     itineraryEditor.revertItinerary();
     setLocalError(null);
+    setExportErrorMessage(null);
     trips.clearError();
     generatedItinerary.clearError();
   }
@@ -207,6 +232,7 @@ export function App() {
     }
 
     setLocalError(null);
+    setExportErrorMessage(null);
     generatedItinerary.clearError();
 
     const result = await trips.reopenTrip(trips.selectedTripId);
@@ -219,8 +245,29 @@ export function App() {
 
   async function handleLoadSavedTrips() {
     setLocalError(null);
+    setExportErrorMessage(null);
     generatedItinerary.clearError();
     await trips.loadSavedTrips();
+  }
+
+  async function handleExportPdf() {
+    if (!trips.selectedTripId) {
+      setExportErrorMessage("Save this itinerary before exporting a PDF.");
+      return;
+    }
+
+    setExportErrorMessage(null);
+    setIsExportingPdf(true);
+
+    try {
+      const pdf = await tripApiClient.exportTripPdf(trips.selectedTripId);
+
+      downloadPdfFile(pdf);
+    } catch (error) {
+      setExportErrorMessage(getTripErrorMessage(error));
+    } finally {
+      setIsExportingPdf(false);
+    }
   }
 
   async function handleCreateShareLink() {
@@ -230,6 +277,7 @@ export function App() {
     }
 
     setLocalError(null);
+    setExportErrorMessage(null);
     generatedItinerary.clearError();
     await trips.createShareLink(trips.selectedTripId);
   }
@@ -237,6 +285,7 @@ export function App() {
   function handleModeChange(nextMode: TripDataMode) {
     setDataMode(nextMode);
     setLocalError(null);
+    setExportErrorMessage(null);
     trips.clearError();
     generatedItinerary.clearError();
   }
@@ -424,6 +473,13 @@ export function App() {
               >
                 Reopen trip
               </button>
+
+              <ExportControls
+                disabledReason={exportDisabledReason}
+                errorMessage={exportErrorMessage}
+                isExporting={isExportingPdf}
+                onExportPdf={handleExportPdf}
+              />
 
               <ShareControls
                 disabledReason={shareDisabledReason}

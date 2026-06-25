@@ -50,6 +50,16 @@ function createMockClient(trip = createTripRecord()): TripApiClient {
       updatedAt: "2026-01-01T00:00:00.000Z"
     })),
     createTrip: vi.fn(async () => trip),
+    exportSharedTripPdf: vi.fn(async () => ({
+      blob: new Blob(["%PDF-1.4"]),
+      contentType: "application/pdf",
+      filename: "shared-trip.pdf"
+    })),
+    exportTripPdf: vi.fn(async () => ({
+      blob: new Blob(["%PDF-1.4"]),
+      contentType: "application/pdf",
+      filename: "trip.pdf"
+    })),
     generateItinerary: vi.fn(async () => ({
       itinerary: mockItinerary,
       metadata: {

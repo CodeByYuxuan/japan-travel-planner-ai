@@ -15,6 +15,8 @@ describe("App", () => {
     expect(html).toContain("Save and reopen");
     expect(html).toContain("Revert local edits");
     expect(html).toContain("Refresh saved trips");
+    expect(html).toContain("PDF itinerary");
+    expect(html).toContain("Save this itinerary before exporting a PDF.");
     expect(html).toContain("Read-only share link");
     expect(html).toContain("Save this itinerary before creating a public share link.");
     expect(html).toContain("No itinerary yet");
