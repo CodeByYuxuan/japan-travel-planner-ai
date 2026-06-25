@@ -3,9 +3,11 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const corsHeaders = {
   "access-control-allow-credentials": "true",
   "access-control-allow-headers": "content-type",
-  "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+  "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "access-control-allow-origin": "http://127.0.0.1:5173"
 };
+
+const publicShareToken = "public-share-token-1234567890abcdef";
 
 const generatedItineraryFixture = {
   title: "AI Generated Tokyo And Kyoto Route",
@@ -171,6 +173,7 @@ async function routeTripPersistence(
   options: { failFirstSave?: boolean } = {}
 ) {
   let savedTrip: ReturnType<typeof createTripRecordFromPayload> | null = null;
+  let shareCreatedForTripId: string | null = null;
   let saveAttempts = 0;
   let lastSavedPayload: TripWritePayload | null = null;
   let lastUpdatedPayload: TripWritePayload | null = null;
@@ -257,9 +260,79 @@ async function routeTripPersistence(
     });
   });
 
+  await page.route("**/api/trips/generated-trip-1/share", async (route) => {
+    if (isOptionsRequest(route)) {
+      await fulfillOptions(route);
+      return;
+    }
+
+    expect(route.request().method()).toBe("POST");
+    shareCreatedForTripId = "generated-trip-1";
+
+    await route.fulfill({
+      contentType: "application/json",
+      headers: corsHeaders,
+      json: {
+        share: {
+          token: publicShareToken,
+          permission: "read_only",
+          expiresAt: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z"
+        }
+      },
+      status: 201
+    });
+  });
+
+  await page.route("**/api/share/*", async (route) => {
+    if (isOptionsRequest(route)) {
+      await fulfillOptions(route);
+      return;
+    }
+
+    expect(route.request().method()).toBe("GET");
+
+    if (
+      route.request().url().endsWith(`/api/share/${publicShareToken}`) &&
+      savedTrip &&
+      shareCreatedForTripId === savedTrip.id
+    ) {
+      await route.fulfill({
+        contentType: "application/json",
+        headers: corsHeaders,
+        json: {
+          share: {
+            token: publicShareToken,
+            permission: "read_only",
+            expiresAt: null,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z"
+          },
+          trip: savedTrip
+        },
+        status: 200
+      });
+      return;
+    }
+
+    await route.fulfill({
+      contentType: "application/json",
+      headers: corsHeaders,
+      json: {
+        error: {
+          code: "SHARE_LINK_NOT_FOUND",
+          message: "Share link was not found."
+        }
+      },
+      status: 404
+    });
+  });
+
   return {
     getLastSavedPayload: () => lastSavedPayload,
     getLastUpdatedPayload: () => lastUpdatedPayload,
+    getShareCreatedForTripId: () => shareCreatedForTripId,
     getSaveAttempts: () => saveAttempts
   };
 }
@@ -550,4 +623,51 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
     "Generated Asakusa lunch",
     patchedEditedTitle
   ]);
+
+  await page.getByRole("button", { name: "Create public link" }).click();
+  expect(persistence.getShareCreatedForTripId()).toBe("generated-trip-1");
+
+  const shareUrlInput = page.getByLabel("Share URL");
+  await expect(shareUrlInput).toHaveValue(
+    new RegExp(`/share/${publicShareToken}$`)
+  );
+
+  const shareUrl = await shareUrlInput.inputValue();
+  await page.goto(new URL(shareUrl).pathname);
+
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "AI Generated Tokyo And Kyoto Route"
+    })
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Day 1: Tokyo" })
+      .getByRole("heading", { name: "Generated Asakusa lunch" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Open in Google Maps" }).first()
+  ).toHaveAttribute(
+    "href",
+    "https://www.google.com/maps/search/?api=1&query=Generated%20Asakusa%20lunch%20Asakusa%20Tokyo"
+  );
+  await expect(page.getByRole("button", { name: /Edit/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Save itinerary" })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Revert local edits" })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Generate AI itinerary" })
+  ).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Save and reopen" })).toHaveCount(
+    0
+  );
+
+  await page.goto("/share/invalid-public-share-token-1234567890");
+  await expect(
+    page.getByRole("heading", { name: "Share link not available" })
+  ).toBeVisible();
 });

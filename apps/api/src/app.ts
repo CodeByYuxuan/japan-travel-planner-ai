@@ -16,6 +16,7 @@ import {
 import { createEnrichmentRouter } from "./routes/enrichment.js";
 import { healthRouter } from "./routes/health.js";
 import { createItinerariesRouter } from "./routes/itineraries.js";
+import { createShareRouter } from "./routes/share.js";
 import { createTripsRouter } from "./routes/trips.js";
 import {
   createAiItineraryService,
@@ -30,6 +31,7 @@ import {
   createProviderResultCache,
   type ProviderResultCache
 } from "./services/enrichment/cache.js";
+import { createShareService, type ShareService } from "./services/shareService.js";
 import { createTripService, type TripService } from "./services/tripService.js";
 
 export type CreateAppOptions = {
@@ -40,6 +42,7 @@ export type CreateAppOptions = {
   mapsProvider?: MapsProvider;
   providerResultCache?: ProviderResultCache;
   sessionMiddleware?: RequestHandler;
+  shareService?: ShareService;
   tripService?: TripService;
   weatherProvider?: WeatherProvider;
 };
@@ -74,6 +77,7 @@ export function createApp(options: CreateAppOptions = {}) {
       windowMs: env.aiGenerationRateLimitWindowMs
     });
   const tripService = options.tripService ?? createTripService();
+  const shareService = options.shareService ?? createShareService();
   const mapsProvider = options.mapsProvider ?? createGoogleMapsProvider();
   const providerResultCache =
     options.providerResultCache ?? createProviderResultCache();
@@ -107,7 +111,12 @@ export function createApp(options: CreateAppOptions = {}) {
       usageLogger: aiUsageLogger
     })
   );
-  app.use("/api/trips", sessionMiddleware, createTripsRouter(tripService));
+  app.use("/api/share", createShareRouter(shareService));
+  app.use(
+    "/api/trips",
+    sessionMiddleware,
+    createTripsRouter(tripService, shareService)
+  );
   app.use(errorHandler);
 
   return app;

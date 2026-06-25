@@ -146,7 +146,7 @@ type PrismaTripWithDays = {
   }>;
 };
 
-const tripWithDaysInclude = {
+export const tripWithDaysInclude = {
   days: {
     orderBy: {
       orderIndex: "asc" as const
@@ -253,7 +253,7 @@ function buildTripUpdateData(input: UpdateTripInput) {
   };
 }
 
-function mapTrip(trip: PrismaTripWithDays): TripResponse {
+export function mapTrip(trip: PrismaTripWithDays): TripResponse {
   return {
     id: trip.id,
     title: trip.title,

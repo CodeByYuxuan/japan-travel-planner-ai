@@ -8,6 +8,7 @@ import type {
   CreateTripInput,
   UpdateTripInput
 } from "../repositories/tripRepository.js";
+import type { ShareService } from "../services/shareService.js";
 import type { TripService } from "../services/tripService.js";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -141,7 +142,10 @@ function getTripId(value: string | string[] | undefined) {
   });
 }
 
-export function createTripsRouter(tripService: TripService) {
+export function createTripsRouter(
+  tripService: TripService,
+  shareService: ShareService
+) {
   const router = Router();
 
   router.get(
@@ -178,6 +182,19 @@ export function createTripsRouter(tripService: TripService) {
       );
 
       response.status(200).json({ trip });
+    })
+  );
+
+  router.post(
+    "/:tripId/share",
+    asyncHandler(async (request, response) => {
+      const session = requireAnonymousSession(request);
+      const result = await shareService.createShareLink(
+        session.id,
+        getTripId(request.params.tripId)
+      );
+
+      response.status(result.reused ? 200 : 201).json({ share: result.share });
     })
   );
 

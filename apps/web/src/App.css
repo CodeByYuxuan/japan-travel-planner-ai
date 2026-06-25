@@ -360,6 +360,77 @@ select {
   letter-spacing: 0;
 }
 
+.share-controls {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #d8e0e6;
+  padding-top: 18px;
+}
+
+.share-controls h3 {
+  margin: 8px 0 0;
+  color: #172026;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.share-help {
+  margin: 0;
+  color: #52616d;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.share-controls > button,
+.share-url-field button {
+  width: 100%;
+  border: 1px solid #0d3b4f;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0d3b4f;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 11px 14px;
+}
+
+.share-controls > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.share-url-field {
+  display: grid;
+  gap: 7px;
+}
+
+.share-url-field label {
+  color: #172026;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.share-url-field div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.share-url-field input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cfd9df;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172026;
+  padding: 10px 11px;
+}
+
+.share-url-field button {
+  width: auto;
+  min-width: 80px;
+}
+
 .mode-toggle,
 .storage-actions {
   display: grid;
@@ -800,6 +871,24 @@ select {
   color: #52616d;
   font-size: 1rem;
   line-height: 1.6;
+}
+
+.shared-app-shell {
+  display: block;
+}
+
+.shared-main {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+.shared-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 420px);
+}
+
+.shared-error {
+  border-color: #efb6ae;
+  background: #fff7f5;
 }
 
 @media (max-width: 820px) {
