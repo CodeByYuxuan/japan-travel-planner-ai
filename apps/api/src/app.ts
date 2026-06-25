@@ -26,6 +26,10 @@ import {
   recordAiUsageSafely,
   type AiUsageLogger
 } from "./services/aiItinerary/usageLogger.js";
+import {
+  createProviderResultCache,
+  type ProviderResultCache
+} from "./services/enrichment/cache.js";
 import { createTripService, type TripService } from "./services/tripService.js";
 
 export type CreateAppOptions = {
@@ -34,6 +38,7 @@ export type CreateAppOptions = {
   aiItineraryService?: AiItineraryService;
   aiUsageLogger?: AiUsageLogger;
   mapsProvider?: MapsProvider;
+  providerResultCache?: ProviderResultCache;
   sessionMiddleware?: RequestHandler;
   tripService?: TripService;
   weatherProvider?: WeatherProvider;
@@ -70,6 +75,8 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   const tripService = options.tripService ?? createTripService();
   const mapsProvider = options.mapsProvider ?? createGoogleMapsProvider();
+  const providerResultCache =
+    options.providerResultCache ?? createProviderResultCache();
   const weatherProvider =
     options.weatherProvider ??
     createOpenWeatherProvider({
@@ -87,7 +94,11 @@ export function createApp(options: CreateAppOptions = {}) {
   app.use("/api/health", healthRouter);
   app.use(
     "/api/enrichment",
-    createEnrichmentRouter({ mapsProvider, weatherProvider })
+    createEnrichmentRouter({
+      mapsProvider,
+      providerResultCache,
+      weatherProvider
+    })
   );
   app.use(
     "/api/itineraries",
