@@ -12,6 +12,11 @@ import {
 } from "../providers/hotels/hotelProvider.js";
 import type { MapsProvider } from "../providers/maps/mapsProvider.js";
 import {
+  RouteProviderError,
+  type RouteHint,
+  type RouteProvider
+} from "../providers/routes/routeProvider.js";
+import {
   WeatherProviderError,
   type WeatherProvider,
   type WeatherSummary
@@ -51,6 +56,7 @@ function createEnrichmentTestApp(
     hotelProvider?: HotelProvider | undefined;
     mapsProvider?: MapsProvider | undefined;
     providerResultCache?: ProviderResultCache | undefined;
+    routeProvider?: RouteProvider | undefined;
     weatherProvider?: WeatherProvider | undefined;
   } = {}
 ) {
@@ -63,6 +69,9 @@ function createEnrichmentTestApp(
       : {}),
     ...(options.mapsProvider !== undefined
       ? { mapsProvider: options.mapsProvider }
+      : {}),
+    ...(options.routeProvider !== undefined
+      ? { routeProvider: options.routeProvider }
       : {}),
     ...(options.weatherProvider !== undefined
       ? { weatherProvider: options.weatherProvider }
@@ -132,6 +141,40 @@ const hotelSuggestion = {
   tags: ["Near Tokyo Station"],
   thumbnailUrl: "https://img.travel.rakuten.co.jp/thumb.jpg"
 } satisfies HotelSuggestion;
+
+const routeHint = {
+  destination: {
+    address: "4 Chome Ueno, Taito City, Tokyo",
+    label: "Ameyoko lunch crawl"
+  },
+  destinationLabel: "Ameyoko lunch crawl",
+  distanceMeters: 900,
+  durationMinutes: 12,
+  id: "test-route-provider:ueno-ameyoko:1",
+  mapUrl: "https://www.google.com/maps/dir/?api=1",
+  origin: {
+    address: "Uenokoen, Taito City, Tokyo",
+    label: "Morning walk through Ueno Park"
+  },
+  originLabel: "Morning walk through Ueno Park",
+  provider: "test-route-provider",
+  sourceUpdatedAt: "2026-06-25T00:00:00.000Z",
+  staticDurationMinutes: 12,
+  steps: [
+    {
+      distanceMeters: 900,
+      durationMinutes: 12,
+      instruction: "Walk toward Ameyoko.",
+      transitLineName: null,
+      travelMode: "walk"
+    }
+  ],
+  summary:
+    "Walk route from Morning walk through Ueno Park to Ameyoko lunch crawl, about 12 min, 900 m.",
+  transitLineNames: [],
+  travelMode: "walk",
+  warnings: []
+} satisfies RouteHint;
 
 describe("POST /api/enrichment/hotels/suggestions", () => {
   test("returns normalized hotel suggestions", async () => {
@@ -372,6 +415,160 @@ describe("POST /api/enrichment/maps/link", () => {
     expect(response.body).toEqual({
       mapUrl: null
     });
+  });
+});
+
+describe("POST /api/enrichment/routes/hints", () => {
+  const payload = {
+    destination: {
+      address: "4 Chome Ueno, Taito City, Tokyo",
+      label: "Ameyoko lunch crawl"
+    },
+    origin: {
+      address: "Uenokoen, Taito City, Tokyo",
+      label: "Morning walk through Ueno Park"
+    },
+    travelMode: "walk"
+  };
+
+  test("returns normalized route hints", async () => {
+    const routeProvider = {
+      getRouteHints: vi.fn(async () => [routeHint]),
+      name: "test-route-provider"
+    } satisfies RouteProvider;
+    const response = await request(createEnrichmentTestApp({ routeProvider }))
+      .post("/api/enrichment/routes/hints")
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(routeProvider.getRouteHints).toHaveBeenCalledWith({
+      ...payload,
+      maxAlternatives: 1
+    });
+    expect(response.body).toEqual({
+      routeHints: [routeHint],
+      status: "available"
+    });
+  });
+
+  test("returns structured validation errors for invalid route input", async () => {
+    const response = await request(
+      createEnrichmentTestApp({
+        routeProvider: {
+          getRouteHints: vi.fn(async () => [routeHint]),
+          name: "test-route-provider"
+        }
+      })
+    )
+      .post("/api/enrichment/routes/hints")
+      .send({
+        destination: {
+          label: "Ameyoko lunch crawl"
+        },
+        origin: {
+          label: "",
+          latitude: 35.7156
+        },
+        travelMode: "transit"
+      });
+
+    expect(response.status).toBe(400);
+    expect(apiErrorSchema.safeParse(response.body).success).toBe(true);
+    expect(response.body.error).toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Request validation failed."
+    });
+    expect(response.body.error.fieldErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "destination.address"
+        }),
+        expect.objectContaining({
+          path: "origin.label"
+        }),
+        expect.objectContaining({
+          path: "origin.longitude"
+        })
+      ])
+    );
+  });
+
+  test("returns a structured missing config error when Google config is absent", async () => {
+    const response = await request(createEnrichmentTestApp())
+      .post("/api/enrichment/routes/hints")
+      .send(payload);
+
+    expect(response.status).toBe(503);
+    expect(apiErrorSchema.safeParse(response.body).success).toBe(true);
+    expect(response.body.error).toEqual({
+      code: "ROUTE_PROVIDER_CONFIGURATION_ERROR",
+      message: "Route enrichment is not configured."
+    });
+  });
+
+  test("degrades provider failure to unavailable route hints", async () => {
+    const routeProvider = {
+      getRouteHints: vi.fn(async () => {
+        throw new RouteProviderError();
+      }),
+      name: "test-route-provider"
+    } satisfies RouteProvider;
+    const response = await request(createEnrichmentTestApp({ routeProvider }))
+      .post("/api/enrichment/routes/hints")
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      routeHints: [],
+      status: "unavailable"
+    });
+  });
+
+  test("returns empty route hints when provider has no route", async () => {
+    const routeProvider = {
+      getRouteHints: vi.fn(async () => []),
+      name: "test-route-provider"
+    } satisfies RouteProvider;
+    const response = await request(createEnrichmentTestApp({ routeProvider }))
+      .post("/api/enrichment/routes/hints")
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      routeHints: [],
+      status: "empty"
+    });
+  });
+
+  test("uses cached route hints for a second identical enrichment request", async () => {
+    const routeProvider = {
+      getRouteHints: vi.fn(async () => [routeHint]),
+      name: "test-route-provider"
+    } satisfies RouteProvider;
+    const app = createEnrichmentTestApp({ routeProvider });
+
+    const firstResponse = await request(app)
+      .post("/api/enrichment/routes/hints")
+      .send(payload);
+    const secondResponse = await request(app)
+      .post("/api/enrichment/routes/hints")
+      .send({
+        destination: {
+          address: "  4 Chome Ueno, Taito City, Tokyo ",
+          label: "Ameyoko lunch crawl"
+        },
+        maxAlternatives: 1,
+        origin: {
+          address: "Uenokoen, Taito City, Tokyo",
+          label: "Morning walk through Ueno Park"
+        },
+        travelMode: "walk"
+      });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(secondResponse.body).toEqual(firstResponse.body);
+    expect(routeProvider.getRouteHints).toHaveBeenCalledTimes(1);
   });
 });
 

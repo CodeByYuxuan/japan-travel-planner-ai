@@ -34,6 +34,48 @@ const hotelSuggestionsFixture = [
     thumbnailUrl: "https://img.travel.rakuten.co.jp/thumb.jpg"
   }
 ];
+const routeHintsFixture = [
+  {
+    destination: {
+      address: "Asakusa, Tokyo",
+      label: "Generated Asakusa lunch"
+    },
+    destinationLabel: "Generated Asakusa lunch",
+    distanceMeters: 1200,
+    durationMinutes: 14,
+    id: "google-routes:generated-sensoji-generated-lunch:1",
+    mapUrl: "https://www.google.com/maps/dir/?api=1",
+    origin: {
+      address: "Senso-ji, Tokyo",
+      label: "Generated Senso-ji morning"
+    },
+    originLabel: "Generated Senso-ji morning",
+    provider: "google-routes",
+    sourceUpdatedAt: "2026-06-25T00:00:00.000Z",
+    staticDurationMinutes: 13,
+    steps: [
+      {
+        distanceMeters: 400,
+        durationMinutes: 5,
+        instruction: "Walk to Asakusa Station.",
+        transitLineName: null,
+        travelMode: "walk"
+      },
+      {
+        distanceMeters: 800,
+        durationMinutes: 8,
+        instruction: "Take the Ginza Line one stop.",
+        transitLineName: "Tokyo Metro Ginza Line",
+        travelMode: "transit"
+      }
+    ],
+    summary:
+      "Transit route from Generated Senso-ji morning to Generated Asakusa lunch, about 14 min, 1.2 km, via Tokyo Metro Ginza Line.",
+    transitLineNames: ["Tokyo Metro Ginza Line"],
+    travelMode: "transit",
+    warnings: []
+  }
+];
 
 const generatedItineraryFixture = {
   title: "AI Generated Tokyo And Kyoto Route",
@@ -190,6 +232,44 @@ async function routeHotelSuggestions(page: Page) {
 
   return {
     getHotelSuggestionRequests: () => hotelSuggestionRequests
+  };
+}
+
+async function routeRouteHints(page: Page) {
+  let routeHintRequests = 0;
+
+  await page.route("**/api/enrichment/routes/hints", async (route) => {
+    if (isOptionsRequest(route)) {
+      await fulfillOptions(route);
+      return;
+    }
+
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postDataJSON()).toMatchObject({
+      city: "Tokyo",
+      destination: {
+        label: "Generated Asakusa lunch"
+      },
+      origin: {
+        label: "Generated Senso-ji morning"
+      },
+      travelMode: "transit"
+    });
+    routeHintRequests += 1;
+
+    await route.fulfill({
+      contentType: "application/json",
+      headers: corsHeaders,
+      json: {
+        routeHints: routeHintsFixture,
+        status: "available"
+      },
+      status: 200
+    });
+  });
+
+  return {
+    getRouteHintRequests: () => routeHintRequests
   };
 }
 
@@ -565,6 +645,7 @@ test("traveler can generate and edit an itinerary from a mocked AI API response"
 }) => {
   await routeGeneratedItinerary(page);
   const hotels = await routeHotelSuggestions(page);
+  const routes = await routeRouteHints(page);
 
   await page.goto("/");
   await page.getByRole("button", { name: "API" }).click();
@@ -600,6 +681,14 @@ test("traveler can generate and edit an itinerary from a mocked AI API response"
     page.getByRole("heading", { name: "Tokyo Station Stay" })
   ).toBeVisible();
   await expect.poll(() => hotels.getHotelSuggestionRequests()).toBe(1);
+  await page.getByRole("button", { name: "Find route" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Generated Senso-ji morning to Generated Asakusa lunch"
+    })
+  ).toBeVisible();
+  await expect(page.getByText("Tokyo Metro Ginza Line").first()).toBeVisible();
+  await expect.poll(() => routes.getRouteHintRequests()).toBe(1);
 
   await page
     .getByRole("button", { name: "Edit Generated Senso-ji morning" })

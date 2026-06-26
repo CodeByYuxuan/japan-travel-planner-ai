@@ -2,6 +2,10 @@ import "./App.css";
 
 import { useMemo, useState } from "react";
 
+import type {
+  Activity,
+  Itinerary
+} from "../../../packages/shared/src/schemas/itinerary.js";
 import type { TripRequest } from "../../../packages/shared/src/schemas/tripRequest.js";
 import {
   downloadPdfFile,
@@ -17,6 +21,10 @@ import {
   useItineraryEditor
 } from "./features/itinerary/editing/useItineraryEditor.js";
 import { useGeneratedItinerary } from "./features/itinerary/useGeneratedItinerary.js";
+import {
+  RouteHints,
+  type RouteHintsStatus
+} from "./features/routes/RouteHints.js";
 import { ShareControls } from "./features/sharing/ShareControls.js";
 import { TripIntakeForm } from "./features/trip-intake/index.js";
 import {
@@ -26,7 +34,11 @@ import {
   type TripDataMode
 } from "./features/trips/useTrips.js";
 import { createTripApiClient } from "./lib/api/client.js";
-import type { HotelSuggestion } from "./lib/api/types.js";
+import type {
+  HotelSuggestion,
+  RouteHint,
+  RouteHintLocation
+} from "./lib/api/types.js";
 import { mockItinerary } from "./mocks/index.js";
 import { SharedTripPage } from "./routes/SharedTripPage.js";
 
@@ -62,6 +74,68 @@ function getCurrentPathname() {
   return typeof window === "undefined" ? "/" : window.location.pathname;
 }
 
+function getActivityRouteAddress(activity: Activity) {
+  return (
+    activity.location.address ??
+    [activity.location.name, activity.location.city]
+      .filter((part): part is string => Boolean(part))
+      .join(", ")
+  );
+}
+
+function getActivityRouteLocation(
+  activity: Activity
+): RouteHintLocation | null {
+  const address = getActivityRouteAddress(activity).trim();
+  const { latitude, longitude } = activity.location;
+  const hasCoordinates = latitude !== undefined && longitude !== undefined;
+
+  if (address.length === 0 && !hasCoordinates) {
+    return null;
+  }
+
+  return {
+    ...(address.length > 0 ? { address } : {}),
+    label: activity.title,
+    ...(hasCoordinates
+      ? {
+          latitude,
+          longitude
+        }
+      : {})
+  };
+}
+
+function getRouteHintTarget(itinerary: Itinerary | null) {
+  if (!itinerary) {
+    return null;
+  }
+
+  for (const day of itinerary.days) {
+    for (let index = 0; index < day.activities.length - 1; index += 1) {
+      const originActivity = day.activities[index];
+      const destinationActivity = day.activities[index + 1];
+
+      if (!originActivity || !destinationActivity) {
+        continue;
+      }
+
+      const origin = getActivityRouteLocation(originActivity);
+      const destination = getActivityRouteLocation(destinationActivity);
+
+      if (origin !== null && destination !== null) {
+        return {
+          city: day.city,
+          destination,
+          origin
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export function App() {
   const shareToken = getShareTokenFromPathname(getCurrentPathname());
   const [activeRequest, setActiveRequest] = useState<TripRequest | null>(null);
@@ -82,6 +156,10 @@ export function App() {
   >(null);
   const [hotelSuggestionsStatus, setHotelSuggestionsStatus] =
     useState<HotelSuggestionsStatus>("idle");
+  const [routeHints, setRouteHints] = useState<RouteHint[]>([]);
+  const [routeHintsError, setRouteHintsError] = useState<string | null>(null);
+  const [routeHintsStatus, setRouteHintsStatus] =
+    useState<RouteHintsStatus>("idle");
   const tripApiClient = useMemo(() => createTripApiClient(), []);
   const generatedItinerary = useGeneratedItinerary();
   const itineraryEditor = useItineraryEditor(null);
@@ -105,11 +183,22 @@ export function App() {
     : undefined;
   const hotelTargetCity =
     itinerary?.days[0]?.city ?? activeRequest?.cities[0] ?? null;
+  const routeHintTarget = useMemo(
+    () => getRouteHintTarget(itinerary),
+    [itinerary]
+  );
   const hotelDisabledReason =
     !itinerary || !activeRequest || !hotelTargetCity
       ? "Create an itinerary before searching hotels."
       : isSubmitting
         ? "Wait for the itinerary to finish before searching hotels."
+        : undefined;
+  const routeHintsDisabledReason = !itinerary
+    ? "Create an itinerary before searching routes."
+    : !routeHintTarget
+      ? "Add at least two located activities before searching routes."
+      : isSubmitting
+        ? "Wait for the itinerary to finish before searching routes."
         : undefined;
   const shareDisabledReason =
     dataMode === "mock"
@@ -179,11 +268,18 @@ export function App() {
     setHotelSuggestionsStatus("idle");
   }
 
+  function resetRouteHints() {
+    setRouteHints([]);
+    setRouteHintsError(null);
+    setRouteHintsStatus("idle");
+  }
+
   function handleMockSubmit(request: TripRequest) {
     setActiveRequest(request);
     setLocalError(null);
     setExportErrorMessage(null);
     resetHotelSuggestions();
+    resetRouteHints();
     trips.clearError();
     generatedItinerary.clearError();
     setIsMockSubmitting(true);
@@ -206,6 +302,7 @@ export function App() {
     setLocalError(null);
     setExportErrorMessage(null);
     resetHotelSuggestions();
+    resetRouteHints();
     trips.clearError();
     generatedItinerary.clearError();
     resetToItinerary(null);
@@ -233,6 +330,7 @@ export function App() {
     setLocalError(null);
     setExportErrorMessage(null);
     setHotelSuggestionsError(null);
+    setRouteHintsError(null);
     generatedItinerary.clearError();
 
     const result = await trips.saveTrip(
@@ -252,6 +350,7 @@ export function App() {
     setLocalError(null);
     setExportErrorMessage(null);
     setHotelSuggestionsError(null);
+    resetRouteHints();
     trips.clearError();
     generatedItinerary.clearError();
   }
@@ -265,6 +364,7 @@ export function App() {
     setLocalError(null);
     setExportErrorMessage(null);
     resetHotelSuggestions();
+    resetRouteHints();
     generatedItinerary.clearError();
 
     const result = await trips.reopenTrip(trips.selectedTripId);
@@ -279,6 +379,7 @@ export function App() {
     setLocalError(null);
     setExportErrorMessage(null);
     setHotelSuggestionsError(null);
+    setRouteHintsError(null);
     generatedItinerary.clearError();
     await trips.loadSavedTrips();
   }
@@ -313,6 +414,37 @@ export function App() {
     }
   }
 
+  async function handleLoadRouteHints() {
+    if (!routeHintTarget) {
+      setRouteHints([]);
+      setRouteHintsError("Create an itinerary before searching routes.");
+      setRouteHintsStatus("error");
+      return;
+    }
+
+    setRouteHints([]);
+    setRouteHintsError(null);
+    setRouteHintsStatus("loading");
+
+    try {
+      const result = await tripApiClient.getRouteHints({
+        city: routeHintTarget.city,
+        destination: routeHintTarget.destination,
+        locale: "en-US",
+        maxAlternatives: 1,
+        origin: routeHintTarget.origin,
+        travelMode: "transit"
+      });
+
+      setRouteHints(result.routeHints);
+      setRouteHintsStatus(result.status);
+    } catch (error) {
+      setRouteHints([]);
+      setRouteHintsError(getTripErrorMessage(error));
+      setRouteHintsStatus("error");
+    }
+  }
+
   async function handleExportPdf() {
     if (!trips.selectedTripId) {
       setExportErrorMessage("Save this itinerary before exporting a PDF.");
@@ -342,6 +474,7 @@ export function App() {
     setLocalError(null);
     setExportErrorMessage(null);
     setHotelSuggestionsError(null);
+    setRouteHintsError(null);
     generatedItinerary.clearError();
     await trips.createShareLink(trips.selectedTripId);
   }
@@ -351,6 +484,7 @@ export function App() {
     setLocalError(null);
     setExportErrorMessage(null);
     resetHotelSuggestions();
+    resetRouteHints();
     trips.clearError();
     generatedItinerary.clearError();
   }
@@ -553,6 +687,16 @@ export function App() {
                 status={hotelSuggestionsStatus}
                 suggestions={hotelSuggestions}
                 targetCity={hotelTargetCity}
+              />
+
+              <RouteHints
+                destinationLabel={routeHintTarget?.destination.label}
+                disabledReason={routeHintsDisabledReason}
+                errorMessage={routeHintsError}
+                onLoadRouteHints={handleLoadRouteHints}
+                originLabel={routeHintTarget?.origin.label}
+                routeHints={routeHints}
+                status={routeHintsStatus}
               />
 
               <ShareControls

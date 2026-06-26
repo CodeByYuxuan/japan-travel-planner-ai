@@ -11,6 +11,8 @@ import {
   createGoogleMapsProvider,
   type MapsProvider
 } from "./providers/maps/mapsProvider.js";
+import { createGoogleRoutesProvider } from "./providers/routes/googleRoutesProvider.js";
+import type { RouteProvider } from "./providers/routes/routeProvider.js";
 import {
   createOpenWeatherProvider,
   type WeatherProvider
@@ -52,6 +54,7 @@ export type CreateAppOptions = {
   mapsProvider?: MapsProvider;
   pdfExportService?: PdfExportService;
   providerResultCache?: ProviderResultCache;
+  routeProvider?: RouteProvider;
   sessionMiddleware?: RequestHandler;
   shareService?: ShareService;
   tripService?: TripService;
@@ -104,6 +107,11 @@ export function createApp(options: CreateAppOptions = {}) {
     createOpenWeatherProvider({
       apiKey: env.weatherApiKey
     });
+  const routeProvider =
+    options.routeProvider ??
+    createGoogleRoutesProvider({
+      apiKey: env.googleMapsApiKey
+    });
   const app = express();
 
   app.use(
@@ -120,6 +128,7 @@ export function createApp(options: CreateAppOptions = {}) {
       hotelProvider,
       mapsProvider,
       providerResultCache,
+      routeProvider,
       weatherProvider
     })
   );
