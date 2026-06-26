@@ -8,6 +8,8 @@ import type {
   HotelSuggestionsRequest,
   HotelSuggestionsResponse,
   PdfExportFile,
+  RouteHintsRequest,
+  RouteHintsResponse,
   ShareLinkRecord,
   SharedTripRecord,
   TripRecord,
@@ -54,6 +56,7 @@ export type TripApiClient = {
   getHotelSuggestions: (
     payload: HotelSuggestionsRequest
   ) => Promise<HotelSuggestionsResponse>;
+  getRouteHints: (payload: RouteHintsRequest) => Promise<RouteHintsResponse>;
   getSharedTrip: (shareToken: string) => Promise<SharedTripRecord>;
   getTrip: (tripId: string) => Promise<TripRecord>;
   listTrips: () => Promise<TripRecord[]>;
@@ -236,6 +239,13 @@ export function createTripApiClient(
           method: "POST"
         }
       );
+    },
+
+    async getRouteHints(payload) {
+      return requestJson<RouteHintsResponse>("/api/enrichment/routes/hints", {
+        body: JSON.stringify(payload),
+        method: "POST"
+      });
     },
 
     async getTrip(tripId) {

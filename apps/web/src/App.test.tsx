@@ -19,6 +19,8 @@ describe("App", () => {
     expect(html).toContain("Save this itinerary before exporting a PDF.");
     expect(html).toContain("Hotel suggestions");
     expect(html).toContain("Create an itinerary before searching hotels.");
+    expect(html).toContain("Route hints");
+    expect(html).toContain("Create an itinerary before searching routes.");
     expect(html).toContain("Read-only share link");
     expect(html).toContain(
       "Save this itinerary before creating a public share link."

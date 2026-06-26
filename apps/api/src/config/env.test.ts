@@ -13,6 +13,7 @@ describe("loadApiEnv", () => {
         AI_GENERATION_RATE_LIMIT_MAX: "9",
         AI_GENERATION_RATE_LIMIT_WINDOW_MS: "120000",
         API_PORT: "4001",
+        GOOGLE_MAPS_API_KEY: "google-routes-test-key",
         OPENAI_API_KEY: "sk-test-api-key",
         OPENAI_MODEL: "gpt-test-model",
         RAKUTEN_ACCESS_KEY: "rakuten-access-key",
@@ -25,6 +26,7 @@ describe("loadApiEnv", () => {
       aiGenerationRateLimitMax: 9,
       aiGenerationRateLimitWindowMs: 120000,
       apiPort: 4001,
+      googleMapsApiKey: "google-routes-test-key",
       openAiApiKey: "sk-test-api-key",
       openAiModel: "gpt-test-model",
       rakutenAccessKey: "rakuten-access-key",
@@ -38,6 +40,7 @@ describe("loadApiEnv", () => {
   test("does not require provider keys during API env loading", () => {
     expect(loadApiEnv({}).openAiApiKey).toBeUndefined();
     expect(loadApiEnv({}).openAiModel).toBe(defaultApiEnv.openAiModel);
+    expect(loadApiEnv({}).googleMapsApiKey).toBeUndefined();
     expect(loadApiEnv({}).rakutenAccessKey).toBeUndefined();
     expect(loadApiEnv({}).rakutenAppId).toBeUndefined();
     expect(loadApiEnv({}).weatherApiKey).toBeUndefined();

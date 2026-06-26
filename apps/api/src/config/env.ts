@@ -2,6 +2,7 @@ export type ApiEnvConfig = {
   aiGenerationRateLimitMax: number;
   aiGenerationRateLimitWindowMs: number;
   apiPort: number;
+  googleMapsApiKey: string | undefined;
   openAiApiKey: string | undefined;
   openAiModel: string;
   rakutenAccessKey: string | undefined;
@@ -18,6 +19,7 @@ export const defaultApiEnv = {
   aiGenerationRateLimitMax: 5,
   aiGenerationRateLimitWindowMs: 60_000,
   apiPort: 3001,
+  googleMapsApiKey: undefined,
   openAiApiKey: undefined,
   openAiModel: defaultOpenAiModel,
   rakutenAccessKey: undefined,
@@ -31,6 +33,7 @@ type ApiEnvSource = {
   AI_GENERATION_RATE_LIMIT_MAX?: string | undefined;
   AI_GENERATION_RATE_LIMIT_WINDOW_MS?: string | undefined;
   API_PORT?: string | undefined;
+  GOOGLE_MAPS_API_KEY?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
   OPENAI_MODEL?: string | undefined;
   RAKUTEN_ACCESS_KEY?: string | undefined;
@@ -158,6 +161,7 @@ export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
       value: env.AI_GENERATION_RATE_LIMIT_WINDOW_MS
     }),
     apiPort: parseApiPort(env.API_PORT),
+    googleMapsApiKey: parseOptionalSecret(env.GOOGLE_MAPS_API_KEY),
     openAiApiKey: parseOpenAiApiKey(env.OPENAI_API_KEY),
     openAiModel: parseOpenAiModel(env.OPENAI_MODEL),
     rakutenAccessKey: parseOptionalSecret(env.RAKUTEN_ACCESS_KEY),

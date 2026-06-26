@@ -82,6 +82,50 @@ function hotelSuggestionsResponse(init: ResponseInit = {}) {
   );
 }
 
+function routeHintsResponse(init: ResponseInit = {}) {
+  return jsonResponse(
+    {
+      routeHints: [
+        {
+          destination: {
+            address: "4 Chome Ueno, Taito City, Tokyo",
+            label: "Ameyoko lunch crawl"
+          },
+          destinationLabel: "Ameyoko lunch crawl",
+          distanceMeters: 900,
+          durationMinutes: 12,
+          id: "google-routes:ueno-ameyoko:1",
+          mapUrl: "https://www.google.com/maps/dir/?api=1",
+          origin: {
+            address: "Uenokoen, Taito City, Tokyo",
+            label: "Morning walk through Ueno Park"
+          },
+          originLabel: "Morning walk through Ueno Park",
+          provider: "google-routes",
+          sourceUpdatedAt: "2026-06-25T00:00:00.000Z",
+          staticDurationMinutes: 12,
+          steps: [
+            {
+              distanceMeters: 900,
+              durationMinutes: 12,
+              instruction: "Walk toward Ameyoko.",
+              transitLineName: null,
+              travelMode: "walk"
+            }
+          ],
+          summary:
+            "Walk route from Morning walk through Ueno Park to Ameyoko lunch crawl, about 12 min, 900 m.",
+          transitLineNames: [],
+          travelMode: "walk",
+          warnings: []
+        }
+      ],
+      status: "available"
+    },
+    init
+  );
+}
+
 describe("createTripApiClient", () => {
   test("creates trips with included anonymous session credentials", async () => {
     const trip = createTripRecord();
@@ -347,6 +391,69 @@ describe("createTripApiClient", () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({
       budget: "moderate",
       city: "Tokyo"
+    });
+  });
+
+  test("requests normalized route hints through the API", async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return routeHintsResponse();
+      }
+    );
+    const client = createTripApiClient({
+      baseUrl: "http://localhost:3001",
+      fetch: fetchMock
+    });
+
+    await expect(
+      client.getRouteHints({
+        destination: {
+          address: "4 Chome Ueno, Taito City, Tokyo",
+          label: "Ameyoko lunch crawl"
+        },
+        origin: {
+          address: "Uenokoen, Taito City, Tokyo",
+          label: "Morning walk through Ueno Park"
+        },
+        travelMode: "walk"
+      })
+    ).resolves.toMatchObject({
+      routeHints: [
+        {
+          destinationLabel: "Ameyoko lunch crawl",
+          originLabel: "Morning walk through Ueno Park",
+          provider: "google-routes"
+        }
+      ],
+      status: "available"
+    });
+
+    const firstCall = fetchMock.mock.calls[0];
+
+    if (!firstCall) {
+      throw new Error("Expected fetch to be called");
+    }
+
+    const [url, init] = firstCall;
+
+    expect(url).toBe("http://localhost:3001/api/enrichment/routes/hints");
+    expect(init).toMatchObject({
+      credentials: "include",
+      method: "POST"
+    });
+    expect(new Headers(init?.headers).get("Accept")).toContain(
+      "application/json"
+    );
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      destination: {
+        label: "Ameyoko lunch crawl"
+      },
+      origin: {
+        label: "Morning walk through Ueno Park"
+      },
+      travelMode: "walk"
     });
   });
 
