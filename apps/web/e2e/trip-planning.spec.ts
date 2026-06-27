@@ -870,6 +870,27 @@ test("traveler can save, refresh, and reopen an edited generated itinerary", asy
   );
 
   const shareUrl = await shareUrlInput.inputValue();
+  const lineShareLink = page.getByRole("link", {
+    name: "Share this read-only itinerary on LINE"
+  });
+  await expect(lineShareLink).toBeVisible();
+  await expect(lineShareLink).toHaveAttribute("target", "_blank");
+
+  const lineShareHref = await lineShareLink.getAttribute("href");
+
+  if (!lineShareHref) {
+    throw new Error("Expected LINE share link to have an href.");
+  }
+
+  const lineShareUrl = new URL(lineShareHref);
+  const lineShareMessage = lineShareUrl.searchParams.get("text") ?? "";
+
+  expect(`${lineShareUrl.origin}${lineShareUrl.pathname}`).toBe(
+    "https://line.me/R/share"
+  );
+  expect(lineShareMessage).toContain(`/share/${publicShareToken}`);
+  expect(lineShareMessage).not.toContain("/api/trips/");
+
   await page.goto(new URL(shareUrl).pathname);
 
   await expect(

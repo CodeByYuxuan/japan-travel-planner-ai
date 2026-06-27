@@ -1,10 +1,15 @@
 import type { ShareLinkRecord } from "../../lib/api/types.js";
+import { LineShareButton } from "./LineShareButton.js";
 
 export type ShareControlsProps = {
+  cities?: readonly string[] | undefined;
   disabledReason?: string | undefined;
+  endDate?: string | null | undefined;
   isSharing?: boolean | undefined;
   onCreateShareLink: () => void;
   shareLink?: ShareLinkRecord | undefined;
+  startDate?: string | null | undefined;
+  title?: string | null | undefined;
   tripId?: string | null | undefined;
 };
 
@@ -21,14 +26,22 @@ export function createShareUrl(token: string, origin?: string) {
 }
 
 export function ShareControls({
+  cities,
   disabledReason,
+  endDate,
   isSharing = false,
   onCreateShareLink,
   shareLink,
+  startDate,
+  title,
   tripId
 }: ShareControlsProps) {
   const shareUrl = shareLink ? createShareUrl(shareLink.token) : null;
   const canCreateShareLink = Boolean(tripId) && !isSharing && !disabledReason;
+  const lineShareDisabledReason =
+    shareUrl === null
+      ? "Create a public share link before sharing on LINE."
+      : disabledReason;
 
   async function copyShareUrl() {
     if (!shareUrl || typeof navigator === "undefined") {
@@ -73,6 +86,15 @@ export function ShareControls({
           </div>
         </div>
       ) : null}
+
+      <LineShareButton
+        cities={cities}
+        disabledReason={lineShareDisabledReason}
+        endDate={endDate}
+        shareUrl={shareUrl}
+        startDate={startDate}
+        title={title}
+      />
     </section>
   );
 }
