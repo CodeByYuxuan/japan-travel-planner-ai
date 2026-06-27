@@ -395,7 +395,9 @@ select {
 .hotel-suggestions > button,
 .route-hints > button,
 .share-controls > button,
-.share-url-field button {
+.share-url-field button,
+.line-share button,
+.line-share-link {
   width: 100%;
   border: 1px solid #0d3b4f;
   border-radius: 6px;
@@ -409,7 +411,8 @@ select {
 .export-controls > button:disabled,
 .hotel-suggestions > button:disabled,
 .route-hints > button:disabled,
-.share-controls > button:disabled {
+.share-controls > button:disabled,
+.line-share button:disabled {
   cursor: not-allowed;
   opacity: 0.72;
 }
@@ -703,6 +706,42 @@ select {
 .share-url-field button {
   width: auto;
   min-width: 80px;
+}
+
+.line-share {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #dce4ea;
+  border-radius: 8px;
+  background: #f8fafb;
+  padding: 12px;
+}
+
+.line-share-label,
+.line-share-help {
+  margin: 0;
+}
+
+.line-share-label {
+  color: #be3f32;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.line-share-help {
+  margin-top: 4px;
+  color: #52616d;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.line-share-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
 }
 
 .mode-toggle,

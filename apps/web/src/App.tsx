@@ -700,10 +700,14 @@ export function App() {
               />
 
               <ShareControls
+                cities={activeRequest?.cities}
                 disabledReason={shareDisabledReason}
+                endDate={activeRequest?.endDate}
                 isSharing={trips.status === "sharing"}
                 onCreateShareLink={handleCreateShareLink}
                 shareLink={selectedShareLink}
+                startDate={activeRequest?.startDate}
+                title={itinerary?.title}
                 tripId={trips.selectedTripId}
               />
             </section>
