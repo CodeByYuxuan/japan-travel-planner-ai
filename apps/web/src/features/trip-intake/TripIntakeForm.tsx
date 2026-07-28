@@ -101,10 +101,7 @@ export function TripIntakeForm({
       <header className="trip-intake-header">
         <p className="section-kicker">Trip setup</p>
         <h2 id="trip-intake-title">Plan your Japan route</h2>
-        <p>
-          Set the travel frame, then create or preview the structured itinerary
-          for this MVP.
-        </p>
+        <p>Choose the route, travel style, and priorities for your trip.</p>
       </header>
 
       <div className="trip-intake-grid">

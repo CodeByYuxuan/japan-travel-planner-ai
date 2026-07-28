@@ -40,7 +40,9 @@ describe("ItineraryView", () => {
     const html = renderToString(<ItineraryView itinerary={null} />);
 
     expect(html).toContain("No itinerary yet");
-    expect(html).toContain("ready for generated or mock trip data");
+    expect(html).toContain(
+      "Add your trip details, then generate with AI or preview a sample route."
+    );
   });
 
   test("renders itinerary days when weather summaries are missing", () => {

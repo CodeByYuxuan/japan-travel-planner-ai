@@ -64,9 +64,12 @@ export function ItineraryView({
   if (!itinerary || itinerary.days.length === 0) {
     return (
       <section className="itinerary-state">
-        <p className="section-kicker">Empty</p>
+        <p className="section-kicker">Your itinerary</p>
         <h2>No itinerary yet</h2>
-        <p>The itinerary board is ready for generated or mock trip data.</p>
+        <p>
+          Add your trip details, then generate with AI or preview a sample
+          route.
+        </p>
       </section>
     );
   }
