@@ -3,6 +3,7 @@
     "name": "Japan Travel Planner",
     "slug": "japan-travel-planner-ai",
     "version": "0.1.0",
+    "platforms": ["ios", "android"],
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
