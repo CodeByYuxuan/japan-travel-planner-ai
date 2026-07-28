@@ -1,128 +1,114 @@
 # Japan Travel Planner AI
 
-Japan Travel Planner AI is a planned AI-powered travel planning application for Japan trips. The goal is to turn a traveler's dates, destinations, pace, budget, and interests into an editable day-by-day itinerary enriched with maps, weather, transportation context, accommodation options, and sharing/export tools.
-
-This repository is being rebuilt from an older project README. The original vision included web, mobile, backend, AI recommendations, Google Maps, Rakuten Travel, weather data, LINE sharing, database persistence, and CI/CD. The new plan keeps that ambition but builds it in smaller phases so the product can become usable quickly.
+Japan Travel Planner AI is a local-first travel planning application for Japan trips. It turns trip dates, cities, pace, budget, and interests into an editable day-by-day itinerary with optional enrichment from maps, weather, hotels, route hints, sharing, and PDF export.
 
 ## Current Status
 
-Project phase: scaffolded rebuild.
+The repository is no longer just an initial scaffold. It now contains a working TypeScript monorepo with:
 
-The current repository contains a minimal TypeScript monorepo skeleton with placeholder web, API, shared, and config packages. Feature work should continue with the web MVP and backend API described in [docs/development_plan.md](docs/development_plan.md).
+- a React + Vite web app for trip intake, itinerary editing, mock/API mode switching, save/reopen flows, public sharing, and PDF export;
+- an Express + TypeScript API with Prisma and PostgreSQL persistence;
+- optional enrichment providers for OpenAI itinerary generation, Google Maps route hints, weather summaries, and Rakuten hotel suggestions that degrade gracefully when credentials are missing.
 
-## Product Goals
+The implementation and acceptance flow are documented in [docs/development_plan.md](docs/development_plan.md), [docs/local_deployment_checklist.md](docs/local_deployment_checklist.md), and [docs/stabilization_validation_after_t33.md](docs/stabilization_validation_after_t33.md).
 
-- Generate personalized Japan itineraries from natural-language trip preferences.
-- Let users edit, reorder, remove, and add activities after generation.
-- Enrich each day with practical travel context: maps, route hints, weather, lodging leads, and local notes.
-- Save trips for later and share them through links, exports, or messaging integrations.
-- Keep the architecture ready for web first, then mobile.
+## Requirements
 
-## MVP Scope
+- Node.js 24 (the repository pins this in [.nvmrc](.nvmrc))
+- Corepack enabled with pnpm 10.14.0
+- Docker Desktop with PostgreSQL 16, or a local PostgreSQL 16 service running on localhost:5432
+- A local checkout outside iCloud-synced folders, because macOS syncing can interfere with pnpm, Prisma, and generated files
 
-The first usable version should focus on a single complete planning loop:
-
-1. A user enters trip dates, cities, interests, travel pace, budget, and constraints.
-2. The app generates a structured itinerary with daily activities.
-3. The user edits the plan in a web UI.
-4. The app saves the trip and can reopen it later.
-5. The app adds basic map links and weather context.
-
-Features such as live transit routing, hotel search, LINE sharing, PDF export, offline mode, and the mobile app should follow after the core itinerary loop is stable.
-
-## Planned Features
-
-### Core
-
-- AI itinerary generation with structured JSON output.
-- Editable day-by-day itinerary board.
-- Trip persistence with user-owned saved plans.
-- City, date, budget, pace, and interest-based personalization.
-- Activity metadata such as location, estimated time, cost level, category, and notes.
-
-### Travel Enrichment
-
-- Google Maps links and route context.
-- Weather summaries from JMA or OpenWeather.
-- Accommodation suggestions through Rakuten Travel or another hotel provider.
-- Transit recommendations through Google Maps Platform or a Japan-specific routing provider.
-
-### Sharing And Delivery
-
-- Public share links.
-- PDF export.
-- LINE sharing integration.
-- Mobile app through Expo and React Native after the web MVP.
-
-## Proposed Tech Stack
-
-| Area            | Proposed Tools                                                                 |
-| --------------- | ------------------------------------------------------------------------------ |
-| Web app         | React, TypeScript, Vite                                                        |
-| Mobile app      | React Native, Expo                                                             |
-| Backend API     | Node.js, TypeScript, Express                                                   |
-| Database        | PostgreSQL with Prisma, or MongoDB if document-first storage is preferred      |
-| AI              | OpenAI API                                                                     |
-| Maps and routes | Google Maps Platform                                                           |
-| Weather         | JMA or OpenWeather                                                             |
-| Hotels          | Rakuten Travel API or another accommodation provider                           |
-| Testing         | Vitest, React Testing Library, Supertest, Playwright                           |
-| CI/CD           | GitHub Actions                                                                 |
-| Hosting         | Vercel or Netlify for web, Render/Railway/Fly.io/GCP for API, managed database |
-
-## Proposed Repository Structure
-
-```text
-japan-travel-planner-ai/
-  apps/
-    web/                 # React + Vite web client
-    api/                 # Express API server
-    mobile/              # Expo app, added after web MVP
-  packages/
-    shared/              # Shared types, schemas, and constants
-    config/              # Shared lint, test, and TypeScript config
-  docs/
-    development_plan.md
-  README.md
-```
-
-## Planned Environment Variables
+## Environment Setup
 
 ```bash
-OPENAI_API_KEY=
-DATABASE_URL=
-GOOGLE_MAPS_API_KEY=
-WEATHER_API_KEY=
-RAKUTEN_API_KEY=
-JWT_SECRET=
-WEB_ORIGIN=http://localhost:5173
-API_PORT=3001
+nvm install
+nvm use
+corepack enable
+corepack prepare pnpm@10.14.0 --activate
+pnpm install --frozen-lockfile
+cp .env.example apps/api/.env
 ```
 
-## Local Development
+The copied environment file should be edited for local use before starting the API. The repository root contains the base template and the API expects the file at [apps/api/.env](apps/api/.env).
 
-Install dependencies:
+## Database Setup
+
+Start PostgreSQL 16 before running Prisma commands. A Docker Desktop example is:
 
 ```bash
-pnpm install
+docker run \
+  --name japan-travel-planner-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=japan_travel_planner_ai \
+  -p 5432:5432 \
+  -d postgres:16-alpine
 ```
 
-Run both local app shells:
+Verify the container is ready:
+
+```bash
+docker exec japan-travel-planner-postgres \
+  pg_isready -U postgres -d japan_travel_planner_ai
+```
+
+Then copy the environment file and initialize the schema and seed data:
+
+```bash
+cp .env.example apps/api/.env
+pnpm --filter @japan-travel-planner/api exec prisma migrate deploy
+pnpm --filter @japan-travel-planner/api db:seed
+```
+
+Subsequent container lifecycle commands:
+
+```bash
+docker start japan-travel-planner-postgres
+docker stop japan-travel-planner-postgres
+```
+
+## Run Locally
+
+Start both app shells:
 
 ```bash
 pnpm dev
 ```
 
-Set up the local database after PostgreSQL is available:
+Or run them separately:
 
 ```bash
-cp .env.example .env
-pnpm --filter @japan-travel-planner/api db:generate
-pnpm --filter @japan-travel-planner/api db:migrate
-pnpm --filter @japan-travel-planner/api db:seed
+pnpm dev:web
+pnpm dev:api
 ```
 
-Run quality checks:
+Target URLs:
+
+- Web: http://localhost:5173
+- API: http://localhost:3001
+
+## Local Acceptance Flow
+
+A practical local acceptance checklist is:
+
+1. Open the web app and confirm the mock preview path works without the API database.
+2. Submit a trip request and verify the itinerary renders in the planner board.
+3. Edit activities, save the itinerary, and reopen the saved trip from the trips panel.
+4. Create a public share link and confirm the read-only shared page opens correctly.
+5. Export the itinerary to PDF and download the file.
+6. Switch to API mode after the database and environment file are ready to validate real persistence and API-backed flows.
+
+## Optional External Services
+
+The app can run in a reduced mode without every provider configured:
+
+- OpenAI is required for real itinerary generation. Without a key, the API returns a clear configuration error and the UI surfaces the failure.
+- Google Maps route hints, weather summaries, and Rakuten hotel suggestions are optional. If their credentials are absent, the corresponding enrichment panels stay disabled or fall back to a no-data state rather than crashing the app.
+
+## Quality Checks
+
+Run the usual local checks before reporting a change:
 
 ```bash
 pnpm lint
@@ -131,57 +117,90 @@ pnpm test
 pnpm build
 ```
 
-Target app URLs:
+Before opening a PR, run the full stabilization validation sequence:
 
-- Web: `http://localhost:5173`
-- API: `http://localhost:3001`
+```bash
+nvm use 24
+corepack enable
+corepack prepare pnpm@10.14.0 --activate
 
-## Architecture Overview
-
-```mermaid
-flowchart TD
-    User["Traveler"] --> Web["Web App: React + Vite"]
-    User --> Mobile["Mobile App: Expo, later phase"]
-
-    Web --> API["API Server: Node + Express"]
-    Mobile --> API
-
-    API --> DB["Database"]
-    API --> AI["OpenAI API"]
-    API --> Maps["Google Maps Platform"]
-    API --> Weather["Weather Provider"]
-    API --> Hotels["Hotel Provider"]
-    API --> Share["Share / Export Services"]
-
-    AI --> API
-    Maps --> API
-    Weather --> API
-    Hotels --> API
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm --filter @japan-travel-planner/api db:validate
+pnpm test:e2e
+git diff --check
 ```
+
+Then manually confirm the runtime flow:
+
+```bash
+pnpm dev:api
+curl -i http://localhost:3001/api/health
+```
+
+In a second terminal:
+
+```bash
+pnpm dev:web
+```
+
+Complete the previously validated acceptance flow: mock preview, save, refresh reopen, edit and save again, public read-only share, and private/public PDF export.
+
+## PR and Merge Workflow
+
+When the documentation-only stabilization work is ready, create an independent PR with:
+
+```bash
+git add .nvmrc package.json README.md docs
+git commit -m "Document stabilized local development workflow"
+git push -u origin stabilize-local-toolchain-after-t33
+```
+
+Create a draft PR:
+
+```bash
+gh pr create \
+  --draft \
+  --base main \
+  --head stabilize-local-toolchain-after-t33 \
+  --title "Stabilize local development and deployment docs"
+```
+
+The PR description should note that the change only updates development environment and local deployment documentation, covers Node 24 / pnpm 10.14, documents Docker/PostgreSQL/Prisma steps, records automated and manual validation, notes the known issue that AI generation returns 500 when OpenAI is not configured, and confirms that Ticket 34 was not started.
+
+After CI is green, merge the PR:
+
+```bash
+gh pr checks <PR_NUMBER> --watch
+gh pr ready <PR_NUMBER>
+gh pr merge <PR_NUMBER> --merge --delete-branch
+
+git switch main
+git pull --ff-only origin main
+```
+
+## Re-evaluating Ticket 34
+
+Only revisit Ticket 34 after all of the following are true:
+
+- PR #33 and the documentation stabilization PR are merged.
+- CI is fully green.
+- A fresh clone can follow the README and start locally without extra setup.
+- PostgreSQL save/reopen/share/PDF flows have passed.
+- The missing-OpenAI 500 behavior has an explicit follow-up ticket.
+- A brief architecture check has been completed for the web state and API boundaries.
+
+At that point, the core mid-term acceptance can be treated as complete, and Ticket 34 can be scoped and dependency-checked before development begins.
 
 ## Documentation
 
-- [Development Plan](docs/development_plan.md)
-
-## Development Priorities
-
-1. Scaffold a TypeScript monorepo.
-2. Build the web itinerary input and results UI.
-3. Add the backend API, validation, and persistence.
-4. Implement structured AI itinerary generation.
-5. Add maps and weather enrichment.
-6. Add sharing/export.
-7. Add hotel and transit integrations.
-8. Add mobile app support.
+- [Local deployment checklist](docs/local_deployment_checklist.md)
+- [Stabilization validation after T33](docs/stabilization_validation_after_t33.md)
+- [Development plan](docs/development_plan.md)
 
 ## License
 
 MIT License. See [LICENSE](LICENSE).
-
-## Developer
-
-Yuxuan LIU
-
-- Email: [liuyuxuan0611@gmail.com](mailto:liuyuxuan0611@gmail.com)
-- LinkedIn: [https://www.linkedin.com/in/yuxuan-liu-rick/](https://www.linkedin.com/in/yuxuan-liu-rick/)
-- GitHub: [https://github.com/CodeByYuxuan](https://github.com/CodeByYuxuan)
