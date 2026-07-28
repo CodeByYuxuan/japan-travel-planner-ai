@@ -14,7 +14,7 @@ export function ItinerarySummary({ itinerary }: ItinerarySummaryProps) {
   return (
     <section className="itinerary-summary" aria-labelledby="itinerary-title">
       <div>
-        <p className="section-kicker">Mock Itinerary</p>
+        <p className="section-kicker">Your itinerary</p>
         <h2 id="itinerary-title">{itinerary.title}</h2>
         <p className="itinerary-date-range">
           {itinerary.startDate} to {itinerary.endDate}

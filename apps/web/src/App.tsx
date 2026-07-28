@@ -42,7 +42,11 @@ import type {
 import { mockItinerary } from "./mocks/index.js";
 import { SharedTripPage } from "./routes/SharedTripPage.js";
 
-const navigationItems = ["Planner", "Trips", "Account"];
+const navigationItems = [
+  { href: "#trip-plan", label: "Plan" },
+  { href: "#itinerary-board", label: "Itinerary" },
+  { href: "#saved-trips", label: "Save & share" }
+];
 
 const mockSubmitDelayMs = 500;
 
@@ -223,27 +227,29 @@ export function App() {
     return <SharedTripPage shareToken={shareToken} />;
   }
 
-  const workspacePanels = [
+  const workflowSteps = [
     {
-      title: "Trip setup",
+      title: "Plan",
       status: isGenerating
         ? "Generating"
         : isSubmitting
           ? "Submitting"
           : "Ready",
-      detail: "Dates, cities, pace, budget, and interests"
+      detail: "Set dates and preferences",
+      state: activeRequest ? "complete" : "current"
     },
     {
-      title: "Itinerary board",
+      title: "Review",
       status: itineraryEditor.isDirty
         ? "Local edits"
         : itinerary
           ? "Preview ready"
           : "Waiting",
-      detail: "Daily activities, timing, locations, cost levels, and notes"
+      detail: "Shape the day-by-day route",
+      state: itinerary ? "complete" : activeRequest ? "current" : "upcoming"
     },
     {
-      title: "Trip storage",
+      title: "Save & share",
       status:
         dataMode === "mock"
           ? "Mock mode"
@@ -252,7 +258,13 @@ export function App() {
             : trips.status === "saved"
               ? "Saved"
               : "API ready",
-      detail: "Anonymous session cookies, saved trips, and reopen controls"
+      detail: "Keep, export, or send the trip",
+      state:
+        trips.status === "saved"
+          ? "complete"
+          : itinerary
+            ? "current"
+            : "upcoming"
     }
   ];
 
@@ -491,6 +503,10 @@ export function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#trip-plan">
+        Skip to trip planner
+      </a>
+
       <aside className="app-sidebar" aria-label="Workspace navigation">
         <div className="brand-lockup">
           <div className="brand-mark" aria-hidden="true">
@@ -503,14 +519,10 @@ export function App() {
         </div>
 
         <nav className="primary-nav" aria-label="Primary navigation">
-          {navigationItems.map((item, index) => (
-            <span
-              aria-current={index === 0 ? "page" : undefined}
-              className="primary-nav-item"
-              key={item}
-            >
-              {item}
-            </span>
+          {navigationItems.map((item) => (
+            <a className="primary-nav-item" href={item.href} key={item.href}>
+              {item.label}
+            </a>
           ))}
         </nav>
       </aside>
@@ -518,11 +530,11 @@ export function App() {
       <main className="app-main" aria-labelledby="workspace-title">
         <section className="workspace-hero">
           <div>
-            <p className="section-kicker">Web MVP Preview</p>
+            <p className="section-kicker">Trip workspace</p>
             <h1 id="workspace-title">Japan trip planner</h1>
             <p className="workspace-state">
-              Build a request from dates, cities, interests, pace, budget, and
-              constraints before saving or previewing a structured itinerary.
+              Plan a route, refine each day, and keep everything ready to reopen
+              or share.
             </p>
           </div>
 
@@ -542,18 +554,23 @@ export function App() {
           </dl>
         </section>
 
-        <section className="workspace-grid" aria-label="Planner areas">
-          {workspacePanels.map((panel) => (
-            <article className="workspace-panel" key={panel.title}>
-              <p className="panel-status">{panel.status}</p>
-              <h2>{panel.title}</h2>
-              <p>{panel.detail}</p>
-            </article>
+        <ol className="workflow-steps" aria-label="Planning progress">
+          {workflowSteps.map((step, index) => (
+            <li data-state={step.state} key={step.title}>
+              <span className="workflow-index" aria-hidden="true">
+                {index + 1}
+              </span>
+              <span className="workflow-copy">
+                <strong>{step.title}</strong>
+                <small>{step.detail}</small>
+              </span>
+              <span className="workflow-status">{step.status}</span>
+            </li>
           ))}
-        </section>
+        </ol>
 
         <section className="planner-workspace" aria-label="Trip planner">
-          <div className="planner-sidebar-panel">
+          <div className="planner-sidebar-panel" id="trip-plan">
             <TripIntakeForm
               isSubmitting={isSubmitting}
               onSubmitTrip={handleTripSubmit}
@@ -573,6 +590,7 @@ export function App() {
             <section
               aria-labelledby="trip-storage-title"
               className="trip-storage-panel"
+              id="saved-trips"
             >
               <header>
                 <p className="section-kicker">Trip storage</p>
@@ -713,17 +731,19 @@ export function App() {
             </section>
           </div>
 
-          <ItineraryView
-            editing={{
-              isDirty: itineraryEditor.isDirty,
-              onAddActivity: itineraryEditor.addActivity,
-              onDeleteActivity: itineraryEditor.deleteActivity,
-              onMoveActivity: itineraryEditor.moveActivity,
-              onUpdateActivity: itineraryEditor.updateActivity
-            }}
-            itinerary={itinerary}
-            isLoading={isSubmitting}
-          />
+          <div className="itinerary-workspace-panel" id="itinerary-board">
+            <ItineraryView
+              editing={{
+                isDirty: itineraryEditor.isDirty,
+                onAddActivity: itineraryEditor.addActivity,
+                onDeleteActivity: itineraryEditor.deleteActivity,
+                onMoveActivity: itineraryEditor.moveActivity,
+                onUpdateActivity: itineraryEditor.updateActivity
+              }}
+              itinerary={itinerary}
+              isLoading={isSubmitting}
+            />
+          </div>
         </section>
       </main>
     </div>
