@@ -1,4 +1,4 @@
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import express, { type RequestHandler } from "express";
 
 import { loadApiEnv, type ApiEnvConfig } from "./config/env.js";
@@ -9,6 +9,7 @@ import {
   getRequestId
 } from "./middleware/requestLogger.js";
 import { createSessionMiddleware } from "./middleware/session.js";
+import { securityHeaders } from "./middleware/securityHeaders.js";
 import { createConsoleLogger, type AppLogger } from "./observability/logger.js";
 import type { HotelProvider } from "./providers/hotels/hotelProvider.js";
 import { createRakutenHotelProvider } from "./providers/hotels/rakutenHotelProvider.js";
@@ -59,6 +60,7 @@ export type CreateAppOptions = {
   logger?: AppLogger;
   mapsProvider?: MapsProvider;
   pdfExportService?: PdfExportService;
+  providerRateLimitMiddleware?: RequestHandler;
   providerResultCache?: ProviderResultCache;
   routeProvider?: RouteProvider;
   sessionMiddleware?: RequestHandler;
@@ -104,6 +106,14 @@ export function createApp(options: CreateAppOptions = {}) {
       },
       windowMs: env.aiGenerationRateLimitWindowMs
     });
+  const providerRateLimitMiddleware =
+    options.providerRateLimitMiddleware ??
+    createRateLimitMiddleware({
+      errorCode: "PROVIDER_RATE_LIMITED",
+      errorMessage: "Too many provider requests. Try again later.",
+      max: env.providerRateLimitMax,
+      windowMs: env.providerRateLimitWindowMs
+    });
   const tripService = options.tripService ?? createTripService();
   const shareService = options.shareService ?? createShareService();
   const pdfExportService = options.pdfExportService ?? createPdfExportService();
@@ -128,21 +138,20 @@ export function createApp(options: CreateAppOptions = {}) {
     });
   const app = express();
 
+  app.disable("x-powered-by");
+  app.set("trust proxy", env.trustProxyHops);
   app.use(
     createRequestLogger({
       logger
     })
   );
-  app.use(
-    cors({
-      credentials: true,
-      origin: env.webOrigin
-    })
-  );
+  app.use(securityHeaders);
+  app.use(cors(createCorsOptions(env.webOrigin)));
   app.use(express.json());
   app.use("/api/health", healthRouter);
   app.use(
     "/api/enrichment",
+    providerRateLimitMiddleware,
     createEnrichmentRouter({
       hotelProvider,
       logger,
@@ -168,4 +177,16 @@ export function createApp(options: CreateAppOptions = {}) {
   app.use(createErrorHandler(logger));
 
   return app;
+}
+
+function createCorsOptions(webOrigin: string): CorsOptions {
+  return {
+    credentials: true,
+    origin: (requestOrigin, callback) => {
+      callback(
+        null,
+        requestOrigin === undefined || requestOrigin === webOrigin
+      );
+    }
+  };
 }

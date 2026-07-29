@@ -17,6 +17,34 @@ describe("API health endpoint", () => {
       status: "ok",
       service: "japan-travel-planner-api"
     });
+    expect(response.headers["x-powered-by"]).toBeUndefined();
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+  });
+});
+
+describe("API browser origin boundary", () => {
+  test("allows the configured web origin with credentials", async () => {
+    const response = await request(createApp({ env: defaultApiEnv }))
+      .get("/api/health")
+      .set("Origin", defaultApiEnv.webOrigin);
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe(
+      defaultApiEnv.webOrigin
+    );
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
+  test("does not emit CORS permission for an unconfigured origin", async () => {
+    const response = await request(createApp({ env: defaultApiEnv }))
+      .get("/api/health")
+      .set("Origin", "https://untrusted.example.com");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(
+      response.headers["access-control-allow-credentials"]
+    ).toBeUndefined();
   });
 });
 

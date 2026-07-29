@@ -18,8 +18,11 @@ describe("loadApiEnv", () => {
         OPENAI_INPUT_COST_PER_MILLION_TOKENS: "2",
         OPENAI_MODEL: "gpt-test-model",
         OPENAI_OUTPUT_COST_PER_MILLION_TOKENS: "8",
+        PROVIDER_RATE_LIMIT_MAX: "45",
+        PROVIDER_RATE_LIMIT_WINDOW_MS: "90000",
         RAKUTEN_ACCESS_KEY: "rakuten-access-key",
         RAKUTEN_APP_ID: "rakuten-app-id",
+        TRUST_PROXY_HOPS: "1",
         WEATHER_API_KEY: "weather-test-key",
         WEB_ORIGIN: "https://planner.example.com",
         JWT_SECRET: "test-session-secret-value"
@@ -33,10 +36,13 @@ describe("loadApiEnv", () => {
       openAiInputCostPerMillionTokens: 2,
       openAiModel: "gpt-test-model",
       openAiOutputCostPerMillionTokens: 8,
+      providerRateLimitMax: 45,
+      providerRateLimitWindowMs: 90000,
       rakutenAccessKey: "rakuten-access-key",
       rakutenAppId: "rakuten-app-id",
       sessionCookieSameSite: "Lax",
       sessionCookieSecure: false,
+      trustProxyHops: 1,
       weatherApiKey: "weather-test-key",
       webOrigin: "https://planner.example.com",
       jwtSecret: "test-session-secret-value"
@@ -115,6 +121,34 @@ describe("loadApiEnv", () => {
         AI_GENERATION_RATE_LIMIT_WINDOW_MS: "not-a-window"
       })
     ).toThrow("Invalid AI_GENERATION_RATE_LIMIT_WINDOW_MS");
+  });
+
+  test("fails clearly for invalid provider rate limit config", () => {
+    expect(() =>
+      loadApiEnv({
+        PROVIDER_RATE_LIMIT_MAX: "0"
+      })
+    ).toThrow("Invalid PROVIDER_RATE_LIMIT_MAX");
+    expect(() =>
+      loadApiEnv({
+        PROVIDER_RATE_LIMIT_WINDOW_MS: "not-a-window"
+      })
+    ).toThrow("Invalid PROVIDER_RATE_LIMIT_WINDOW_MS");
+  });
+
+  test("validates reverse proxy hop configuration", () => {
+    expect(loadApiEnv({ TRUST_PROXY_HOPS: "0" }).trustProxyHops).toBe(0);
+    expect(loadApiEnv({ TRUST_PROXY_HOPS: "1" }).trustProxyHops).toBe(1);
+    expect(() =>
+      loadApiEnv({
+        TRUST_PROXY_HOPS: "-1"
+      })
+    ).toThrow("Invalid TRUST_PROXY_HOPS");
+    expect(() =>
+      loadApiEnv({
+        TRUST_PROXY_HOPS: "11"
+      })
+    ).toThrow("Invalid TRUST_PROXY_HOPS");
   });
 
   test("fails clearly for invalid OpenAI cost config", () => {

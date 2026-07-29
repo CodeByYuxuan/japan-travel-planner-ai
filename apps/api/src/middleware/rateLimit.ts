@@ -13,6 +13,8 @@ export type RateLimitStore = {
 
 export type RateLimitOptions = {
   clock?: () => number;
+  errorCode?: string;
+  errorMessage?: string;
   getIdentifier?: (request: Request) => string;
   max: number;
   onRateLimited?: (event: {
@@ -51,12 +53,6 @@ export class InMemoryRateLimitStore implements RateLimitStore {
 }
 
 export function getClientRateLimitIdentifier(request: Request) {
-  const forwardedFor = request.get("x-forwarded-for")?.split(",")[0]?.trim();
-
-  if (forwardedFor !== undefined && forwardedFor.length > 0) {
-    return forwardedFor;
-  }
-
   return request.ip || request.socket.remoteAddress || "unknown";
 }
 
@@ -73,16 +69,22 @@ export function createRateLimitMiddleware(
     const nowMs = clock();
     const identifier = getIdentifier(request);
     const entry = store.increment(identifier, nowMs, options.windowMs);
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((entry.resetAt - nowMs) / 1000)
+    );
+
+    response.setHeader("RateLimit-Limit", String(options.max));
+    response.setHeader(
+      "RateLimit-Remaining",
+      String(Math.max(0, options.max - entry.count))
+    );
+    response.setHeader("RateLimit-Reset", String(retryAfterSeconds));
 
     if (entry.count <= options.max) {
       next();
       return;
     }
-
-    const retryAfterSeconds = Math.max(
-      1,
-      Math.ceil((entry.resetAt - nowMs) / 1000)
-    );
 
     response.setHeader("Retry-After", String(retryAfterSeconds));
     void options.onRateLimited?.({
@@ -93,8 +95,10 @@ export function createRateLimitMiddleware(
     next(
       new ApiError({
         statusCode: 429,
-        code: "RATE_LIMITED",
-        message: "Too many itinerary generation requests. Try again later.",
+        code: options.errorCode ?? "RATE_LIMITED",
+        message:
+          options.errorMessage ??
+          "Too many itinerary generation requests. Try again later.",
         details: {
           retryAfterSeconds
         }

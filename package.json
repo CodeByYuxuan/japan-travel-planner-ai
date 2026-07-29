@@ -13,6 +13,7 @@
     "dev:web": "pnpm --filter @japan-travel-planner/web dev",
     "dev:api": "pnpm --filter @japan-travel-planner/api dev",
     "dev:mobile": "pnpm --filter @japan-travel-planner/mobile start",
+    "check:client-secrets": "node scripts/check-client-secret-exposure.mjs",
     "lint": "eslint .",
     "format": "prettier . --write",
     "build": "pnpm --filter @japan-travel-planner/shared build && pnpm --filter @japan-travel-planner/api build && pnpm --filter @japan-travel-planner/web build && pnpm --filter @japan-travel-planner/mobile build",
