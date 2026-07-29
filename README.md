@@ -106,6 +106,24 @@ The app can run in a reduced mode without every provider configured:
 - OpenAI is required for real itinerary generation. Without a key, the API returns a clear configuration error and the UI surfaces the failure.
 - Google Maps route hints, weather summaries, and Rakuten hotel suggestions are optional. If their credentials are absent, the corresponding enrichment panels stay disabled or fall back to a no-data state rather than crashing the app.
 
+## Production Deployment
+
+The selected production targets are:
+
+- Vercel for the React + Vite web app;
+- Render Web Service for the Express API;
+- Render PostgreSQL 16 for the managed database.
+
+Repository-level configuration lives in [vercel.json](vercel.json) and
+[render.yaml](render.yaml). Both provider projects use `main` as the production
+branch. Render waits for GitHub checks to pass and runs committed Prisma
+migrations before starting the new API release.
+
+Required environment variables, cost notes, first-deploy ordering, validation,
+and rollback guidance are documented in
+[docs/deployment.md](docs/deployment.md). Secret values must be configured in
+Vercel or Render and must never be committed.
+
 ## Quality Checks
 
 Run the usual local checks before reporting a change:
@@ -197,6 +215,7 @@ At that point, the core mid-term acceptance can be treated as complete, and Tick
 
 ## Documentation
 
+- [Production deployment](docs/deployment.md)
 - [Local deployment checklist](docs/local_deployment_checklist.md)
 - [Stabilization validation after T33](docs/stabilization_validation_after_t33.md)
 - [Development plan](docs/development_plan.md)

@@ -24,6 +24,14 @@ describe("database client setup", () => {
     ).toThrow("Invalid DATABASE_URL");
   });
 
+  test("requires DATABASE_URL in production", () => {
+    expect(() =>
+      loadDatabaseUrl({
+        NODE_ENV: "production"
+      })
+    ).toThrow("Invalid DATABASE_URL");
+  });
+
   test("creates a Prisma client without connecting to the database", async () => {
     const client = createPrismaClient(defaultDatabaseUrl);
 

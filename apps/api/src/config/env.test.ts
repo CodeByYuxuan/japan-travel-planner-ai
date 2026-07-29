@@ -31,6 +31,8 @@ describe("loadApiEnv", () => {
       openAiModel: "gpt-test-model",
       rakutenAccessKey: "rakuten-access-key",
       rakutenAppId: "rakuten-app-id",
+      sessionCookieSameSite: "Lax",
+      sessionCookieSecure: false,
       weatherApiKey: "weather-test-key",
       webOrigin: "https://planner.example.com",
       jwtSecret: "test-session-secret-value"
@@ -65,6 +67,35 @@ describe("loadApiEnv", () => {
         WEB_ORIGIN: "http://localhost:5173"
       })
     ).toThrow("Invalid API_PORT");
+  });
+
+  test("uses the hosting platform PORT when API_PORT is not set", () => {
+    expect(
+      loadApiEnv({
+        PORT: "10000"
+      })
+    ).toMatchObject({
+      apiPort: 10000
+    });
+  });
+
+  test("prefers API_PORT over the hosting platform PORT", () => {
+    expect(
+      loadApiEnv({
+        API_PORT: "4001",
+        PORT: "10000"
+      })
+    ).toMatchObject({
+      apiPort: 4001
+    });
+  });
+
+  test("fails clearly for invalid hosting platform PORT", () => {
+    expect(() =>
+      loadApiEnv({
+        PORT: "not-a-port"
+      })
+    ).toThrow("Invalid PORT");
   });
 
   test("fails clearly for invalid AI generation rate limit config", () => {
@@ -103,5 +134,18 @@ describe("loadApiEnv", () => {
         NODE_ENV: "production"
       })
     ).toThrow("Invalid JWT_SECRET");
+  });
+
+  test("uses secure cross-site session cookies in production", () => {
+    expect(
+      loadApiEnv({
+        JWT_SECRET: "production-session-secret",
+        NODE_ENV: "production",
+        WEB_ORIGIN: "https://planner.example.com"
+      })
+    ).toMatchObject({
+      sessionCookieSameSite: "None",
+      sessionCookieSecure: true
+    });
   });
 });
