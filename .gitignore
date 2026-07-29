@@ -8,6 +8,7 @@ coverage/
 playwright-report/
 test-results/
 apps/api/src/generated/
+.expo/
 
 # Local environment
 .env
