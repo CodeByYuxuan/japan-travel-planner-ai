@@ -5,6 +5,10 @@ import {
   type HotelSuggestion,
   type HotelSuggestionRequest
 } from "../../providers/hotels/hotelProvider.js";
+import {
+  reportProviderFailureSafely,
+  type ProviderFailureReporter
+} from "../../observability/providerFailure.js";
 import type { ProviderResultCache } from "./cache.js";
 
 export const hotelSuggestionsCacheTtlMs = 24 * 60 * 60 * 1000;
@@ -21,7 +25,8 @@ export type HotelEnrichmentResult =
 
 export async function createHotelSuggestions(
   input: HotelSuggestionRequest,
-  provider: HotelProvider
+  provider: HotelProvider,
+  reportProviderFailure?: ProviderFailureReporter
 ): Promise<HotelEnrichmentResult> {
   try {
     const hotelSuggestions = await provider.searchHotels(input);
@@ -39,16 +44,31 @@ export async function createHotelSuggestions(
     };
   } catch (error) {
     if (error instanceof HotelProviderConfigurationError) {
+      reportProviderFailureSafely(reportProviderFailure, {
+        failureCategory: "configuration",
+        operation: "hotels.suggestions",
+        provider: provider.name
+      });
       throw error;
     }
 
     if (error instanceof HotelProviderError) {
+      reportProviderFailureSafely(reportProviderFailure, {
+        failureCategory: "request_failed",
+        operation: "hotels.suggestions",
+        provider: provider.name
+      });
       return {
         hotelSuggestions: [],
         status: "unavailable"
       };
     }
 
+    reportProviderFailureSafely(reportProviderFailure, {
+      failureCategory: "unexpected",
+      operation: "hotels.suggestions",
+      provider: provider.name
+    });
     return {
       hotelSuggestions: [],
       status: "unavailable"
@@ -113,14 +133,15 @@ export function normalizeHotelSuggestionsCacheInput(
 export async function createCachedHotelSuggestions(
   input: HotelSuggestionRequest,
   provider: HotelProvider,
-  cache: ProviderResultCache
+  cache: ProviderResultCache,
+  reportProviderFailure?: ProviderFailureReporter
 ): Promise<HotelEnrichmentResult> {
   const result = await cache.getOrSet({
     provider: provider.name,
     operation: "hotels.suggestions",
     input: normalizeHotelSuggestionsCacheInput(input),
     ttlMs: hotelSuggestionsCacheTtlMs,
-    load: () => createHotelSuggestions(input, provider),
+    load: () => createHotelSuggestions(input, provider, reportProviderFailure),
     isCachedValue: isHotelEnrichmentResult,
     shouldCache: (hotelResult) => hotelResult.status !== "unavailable"
   });

@@ -5,8 +5,10 @@ import { z } from "zod";
 
 import { apiErrorSchema } from "../../../../packages/shared/src/schemas/apiError.js";
 import { ApiError } from "../errors/ApiError.js";
+import { createConsoleLogger, type LogEntry } from "../observability/logger.js";
 
-import { errorHandler } from "./errorHandler.js";
+import { createErrorHandler } from "./errorHandler.js";
+import { createRequestLogger } from "./requestLogger.js";
 import { validateRequest } from "./validateRequest.js";
 
 const testBodySchema = z
@@ -18,9 +20,19 @@ const testBodySchema = z
 
 const originalNodeEnv = process.env.NODE_ENV;
 
-function createMiddlewareTestApp() {
+function createMiddlewareTestApp(logEntries: LogEntry[] = []) {
   const app = express();
+  const logger = createConsoleLogger({
+    clock: () => new Date("2026-07-29T00:00:00.000Z"),
+    sink: (entry) => logEntries.push(entry)
+  });
 
+  app.use(
+    createRequestLogger({
+      createRequestId: () => "generated-request-id",
+      logger
+    })
+  );
   app.use(express.json());
   app.post(
     "/test/validated",
@@ -41,7 +53,7 @@ function createMiddlewareTestApp() {
   app.get("/test/unexpected-error", () => {
     throw new Error("Sensitive database connection string leaked.");
   });
-  app.use(errorHandler);
+  app.use(createErrorHandler(logger));
 
   return app;
 }
@@ -125,9 +137,10 @@ describe("errorHandler", () => {
   });
 
   test("returns safe structured responses for unexpected errors", async () => {
-    const response = await request(createMiddlewareTestApp()).get(
-      "/test/unexpected-error"
-    );
+    const logEntries: LogEntry[] = [];
+    const response = await request(createMiddlewareTestApp(logEntries))
+      .get("/test/unexpected-error")
+      .set("X-Request-Id", "unexpected-error-request");
 
     expect(response.status).toBe(500);
     expectSharedErrorResponse(response.body);
@@ -137,6 +150,21 @@ describe("errorHandler", () => {
         message: "Unexpected server error."
       }
     });
+    expect(logEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "unexpected",
+          code: "INTERNAL_SERVER_ERROR",
+          errorName: "Error",
+          event: "api_error",
+          requestId: "unexpected-error-request",
+          statusCode: 500
+        })
+      ])
+    );
+    expect(JSON.stringify(logEntries)).not.toContain(
+      "Sensitive database connection string"
+    );
   });
 
   test("does not expose stack traces in non-development mode", async () => {

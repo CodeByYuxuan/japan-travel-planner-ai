@@ -3,6 +3,11 @@ import type { Itinerary, TripRequest } from "@japan-travel-planner/shared";
 import { type ApiEnvConfig, loadApiEnv } from "../../config/env.js";
 import { ApiError } from "../../errors/ApiError.js";
 import {
+  combineTokenUsage,
+  estimateAiCostUsd,
+  type AiTokenPricing
+} from "../../observability/metrics.js";
+import {
   createOpenAiProviderFromEnv,
   type OpenAiTextRequest,
   type OpenAiTextResult
@@ -17,6 +22,7 @@ import {
 import {
   type AiUsageLogger,
   type AiUsageOutcome,
+  type AiTokenUsage,
   createConsoleAiUsageLogger,
   recordAiUsageSafely
 } from "./usageLogger.js";
@@ -27,10 +33,10 @@ export type AiItineraryProvider = {
 
 export type AiItineraryGenerationMetadata = {
   attempts: number;
+  estimatedCostUsd: number | null;
   repaired: boolean;
   model: string;
-  tokenUsage: null;
-  estimatedCostUsd: null;
+  tokenUsage: AiTokenUsage | null;
 };
 
 export type GenerateItineraryResult = {
@@ -40,17 +46,24 @@ export type GenerateItineraryResult = {
 
 export type AiItineraryGenerationContext = {
   requestIdentifier?: string | undefined;
+  requestId?: string | undefined;
 };
 
 type AiItineraryServiceOptions = {
+  pricing?: AiTokenPricing | undefined;
   providerFactory: () => AiItineraryProvider;
   usageLogger?: AiUsageLogger | undefined;
 };
 
 export class AiItineraryService {
+  private readonly pricing: AiTokenPricing;
   private readonly usageLogger: AiUsageLogger;
 
   constructor(private readonly options: AiItineraryServiceOptions) {
+    this.pricing = options.pricing ?? {
+      inputCostPerMillionTokens: null,
+      outputCostPerMillionTokens: null
+    };
     this.usageLogger = options.usageLogger ?? createConsoleAiUsageLogger();
   }
 
@@ -60,6 +73,7 @@ export class AiItineraryService {
   ): Promise<GenerateItineraryResult> {
     let attempts = 0;
     let model: string | null = null;
+    let tokenUsage: AiTokenUsage | null = null;
 
     try {
       const provider = this.createProvider();
@@ -70,6 +84,7 @@ export class AiItineraryService {
         input: prompt.input
       });
       model = firstResponse.model;
+      tokenUsage = combineTokenUsage(tokenUsage, firstResponse.tokenUsage);
 
       try {
         const result = {
@@ -77,7 +92,9 @@ export class AiItineraryService {
           metadata: createGenerationMetadata({
             attempts: 1,
             model: firstResponse.model,
-            repaired: false
+            pricing: this.pricing,
+            repaired: false,
+            tokenUsage
           })
         };
 
@@ -103,6 +120,7 @@ export class AiItineraryService {
           input: repairPrompt.input
         });
         model = repairResponse.model;
+        tokenUsage = combineTokenUsage(tokenUsage, repairResponse.tokenUsage);
 
         try {
           const result = {
@@ -110,7 +128,9 @@ export class AiItineraryService {
             metadata: createGenerationMetadata({
               attempts: 2,
               model: repairResponse.model,
-              repaired: true
+              pricing: this.pricing,
+              repaired: true,
+              tokenUsage
             })
           };
 
@@ -142,7 +162,8 @@ export class AiItineraryService {
         attempts,
         context,
         error,
-        model
+        model,
+        tokenUsage
       });
       throw error;
     }
@@ -178,6 +199,7 @@ export class AiItineraryService {
       model: options.metadata.model,
       outcome: options.outcome,
       requestIdentifier: options.context.requestIdentifier,
+      requestId: options.context.requestId,
       tokenUsage: options.metadata.tokenUsage
     });
   }
@@ -187,6 +209,7 @@ export class AiItineraryService {
     context: AiItineraryGenerationContext;
     error: unknown;
     model: string | null;
+    tokenUsage: AiTokenUsage | null;
   }) {
     const outcome = generationErrorToUsageOutcome(options.error);
 
@@ -196,11 +219,12 @@ export class AiItineraryService {
 
     await recordAiUsageSafely(this.usageLogger, {
       attempts: options.attempts,
-      estimatedCostUsd: null,
+      estimatedCostUsd: estimateAiCostUsd(options.tokenUsage, this.pricing),
       model: options.model,
       outcome,
       requestIdentifier: options.context.requestIdentifier,
-      tokenUsage: null
+      requestId: options.context.requestId,
+      tokenUsage: options.tokenUsage
     });
   }
 }
@@ -210,6 +234,10 @@ export function createAiItineraryService(
   options: { usageLogger?: AiUsageLogger } = {}
 ): AiItineraryService {
   return new AiItineraryService({
+    pricing: {
+      inputCostPerMillionTokens: env.openAiInputCostPerMillionTokens,
+      outputCostPerMillionTokens: env.openAiOutputCostPerMillionTokens
+    },
     providerFactory: () => createOpenAiProviderFromEnv(env),
     usageLogger: options.usageLogger
   });
@@ -219,13 +247,15 @@ function createGenerationMetadata(options: {
   attempts: number;
   repaired: boolean;
   model: string;
+  pricing: AiTokenPricing;
+  tokenUsage: AiTokenUsage | null;
 }): AiItineraryGenerationMetadata {
   return {
     attempts: options.attempts,
+    estimatedCostUsd: estimateAiCostUsd(options.tokenUsage, options.pricing),
     repaired: options.repaired,
     model: options.model,
-    tokenUsage: null,
-    estimatedCostUsd: null
+    tokenUsage: options.tokenUsage
   };
 }
 

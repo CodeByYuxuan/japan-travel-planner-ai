@@ -7,10 +7,14 @@ import type { TripRequest } from "../../../../../packages/shared/src/schemas/tri
 
 export type GenerateItineraryMetadata = {
   attempts: number;
+  estimatedCostUsd: number | null;
   repaired: boolean;
   model: string;
-  tokenUsage: null;
-  estimatedCostUsd: null;
+  tokenUsage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  } | null;
 };
 
 export type GenerateItineraryResponse = {

@@ -15,7 +15,9 @@ describe("loadApiEnv", () => {
         API_PORT: "4001",
         GOOGLE_MAPS_API_KEY: "google-routes-test-key",
         OPENAI_API_KEY: "sk-test-api-key",
+        OPENAI_INPUT_COST_PER_MILLION_TOKENS: "2",
         OPENAI_MODEL: "gpt-test-model",
+        OPENAI_OUTPUT_COST_PER_MILLION_TOKENS: "8",
         RAKUTEN_ACCESS_KEY: "rakuten-access-key",
         RAKUTEN_APP_ID: "rakuten-app-id",
         WEATHER_API_KEY: "weather-test-key",
@@ -28,7 +30,9 @@ describe("loadApiEnv", () => {
       apiPort: 4001,
       googleMapsApiKey: "google-routes-test-key",
       openAiApiKey: "sk-test-api-key",
+      openAiInputCostPerMillionTokens: 2,
       openAiModel: "gpt-test-model",
+      openAiOutputCostPerMillionTokens: 8,
       rakutenAccessKey: "rakuten-access-key",
       rakutenAppId: "rakuten-app-id",
       sessionCookieSameSite: "Lax",
@@ -42,6 +46,8 @@ describe("loadApiEnv", () => {
   test("does not require provider keys during API env loading", () => {
     expect(loadApiEnv({}).openAiApiKey).toBeUndefined();
     expect(loadApiEnv({}).openAiModel).toBe(defaultApiEnv.openAiModel);
+    expect(loadApiEnv({}).openAiInputCostPerMillionTokens).toBeNull();
+    expect(loadApiEnv({}).openAiOutputCostPerMillionTokens).toBeNull();
     expect(loadApiEnv({}).googleMapsApiKey).toBeUndefined();
     expect(loadApiEnv({}).rakutenAccessKey).toBeUndefined();
     expect(loadApiEnv({}).rakutenAppId).toBeUndefined();
@@ -109,6 +115,19 @@ describe("loadApiEnv", () => {
         AI_GENERATION_RATE_LIMIT_WINDOW_MS: "not-a-window"
       })
     ).toThrow("Invalid AI_GENERATION_RATE_LIMIT_WINDOW_MS");
+  });
+
+  test("fails clearly for invalid OpenAI cost config", () => {
+    expect(() =>
+      loadApiEnv({
+        OPENAI_INPUT_COST_PER_MILLION_TOKENS: "-1"
+      })
+    ).toThrow("Invalid OPENAI_INPUT_COST_PER_MILLION_TOKENS");
+    expect(() =>
+      loadApiEnv({
+        OPENAI_OUTPUT_COST_PER_MILLION_TOKENS: "not-a-number"
+      })
+    ).toThrow("Invalid OPENAI_OUTPUT_COST_PER_MILLION_TOKENS");
   });
 
   test("fails clearly for invalid WEB_ORIGIN", () => {

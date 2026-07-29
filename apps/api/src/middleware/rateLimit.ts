@@ -17,6 +17,7 @@ export type RateLimitOptions = {
   max: number;
   onRateLimited?: (event: {
     identifier: string;
+    request: Request;
     retryAfterSeconds: number;
   }) => Promise<void> | void;
   store?: RateLimitStore;
@@ -86,6 +87,7 @@ export function createRateLimitMiddleware(
     response.setHeader("Retry-After", String(retryAfterSeconds));
     void options.onRateLimited?.({
       identifier,
+      request,
       retryAfterSeconds
     });
     next(

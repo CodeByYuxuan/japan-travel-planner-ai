@@ -15,6 +15,14 @@ export type OpenAiResponseCreateParams = {
 
 export type OpenAiResponseResult = {
   output_text?: string | undefined;
+  usage?:
+    | {
+        input_tokens?: number | undefined;
+        output_tokens?: number | undefined;
+        total_tokens?: number | undefined;
+      }
+    | null
+    | undefined;
 };
 
 export type OpenAiResponsesClient = {
@@ -31,9 +39,16 @@ export type OpenAiTextRequest = {
   model?: string;
 };
 
+export type OpenAiTokenUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+};
+
 export type OpenAiTextResult = {
   model: string;
   text: string;
+  tokenUsage?: OpenAiTokenUsage | null;
 };
 
 export class OpenAiProvider {
@@ -54,9 +69,35 @@ export class OpenAiProvider {
 
     return {
       model,
-      text: response.output_text ?? ""
+      text: response.output_text ?? "",
+      tokenUsage: normalizeTokenUsage(response.usage)
     };
   }
+}
+
+function normalizeTokenUsage(
+  usage: OpenAiResponseResult["usage"]
+): OpenAiTokenUsage | null {
+  if (usage === null || usage === undefined) {
+    return null;
+  }
+
+  const inputTokens = normalizeTokenCount(usage.input_tokens);
+  const outputTokens = normalizeTokenCount(usage.output_tokens);
+  const totalTokens = normalizeTokenCount(usage.total_tokens);
+  const normalizedUsage = {
+    ...(inputTokens !== null ? { inputTokens } : {}),
+    ...(outputTokens !== null ? { outputTokens } : {}),
+    ...(totalTokens !== null ? { totalTokens } : {})
+  };
+
+  return Object.keys(normalizedUsage).length > 0 ? normalizedUsage : null;
+}
+
+function normalizeTokenCount(value: number | undefined) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null;
 }
 
 export function createOpenAiSdkClient(config: OpenAiProviderConfig) {

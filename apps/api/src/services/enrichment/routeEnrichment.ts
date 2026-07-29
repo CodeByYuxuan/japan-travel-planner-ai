@@ -7,6 +7,10 @@ import {
   type RouteHintStep,
   type RouteProvider
 } from "../../providers/routes/routeProvider.js";
+import {
+  reportProviderFailureSafely,
+  type ProviderFailureReporter
+} from "../../observability/providerFailure.js";
 import type { ProviderResultCache } from "./cache.js";
 
 export const routeHintsCacheTtlMs = 12 * 60 * 60 * 1000;
@@ -23,7 +27,8 @@ export type RouteEnrichmentResult =
 
 export async function createRouteHints(
   input: RouteHintRequest,
-  provider: RouteProvider
+  provider: RouteProvider,
+  reportProviderFailure?: ProviderFailureReporter
 ): Promise<RouteEnrichmentResult> {
   try {
     const routeHints = await provider.getRouteHints(input);
@@ -41,16 +46,31 @@ export async function createRouteHints(
     };
   } catch (error) {
     if (error instanceof RouteProviderConfigurationError) {
+      reportProviderFailureSafely(reportProviderFailure, {
+        failureCategory: "configuration",
+        operation: "routes.hints",
+        provider: provider.name
+      });
       throw error;
     }
 
     if (error instanceof RouteProviderError) {
+      reportProviderFailureSafely(reportProviderFailure, {
+        failureCategory: "request_failed",
+        operation: "routes.hints",
+        provider: provider.name
+      });
       return {
         routeHints: [],
         status: "unavailable"
       };
     }
 
+    reportProviderFailureSafely(reportProviderFailure, {
+      failureCategory: "unexpected",
+      operation: "routes.hints",
+      provider: provider.name
+    });
     return {
       routeHints: [],
       status: "unavailable"
@@ -156,14 +176,15 @@ export function normalizeRouteHintsCacheInput(input: RouteHintRequest) {
 export async function createCachedRouteHints(
   input: RouteHintRequest,
   provider: RouteProvider,
-  cache: ProviderResultCache
+  cache: ProviderResultCache,
+  reportProviderFailure?: ProviderFailureReporter
 ): Promise<RouteEnrichmentResult> {
   const result = await cache.getOrSet({
     provider: provider.name,
     operation: "routes.hints",
     input: normalizeRouteHintsCacheInput(input),
     ttlMs: routeHintsCacheTtlMs,
-    load: () => createRouteHints(input, provider),
+    load: () => createRouteHints(input, provider, reportProviderFailure),
     isCachedValue: isRouteEnrichmentResult,
     shouldCache: (routeResult) => routeResult.status !== "unavailable"
   });

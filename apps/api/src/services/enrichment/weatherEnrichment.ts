@@ -5,6 +5,10 @@ import {
   type WeatherSummary,
   type WeatherSummaryRequest
 } from "../../providers/weather/weatherProvider.js";
+import {
+  reportProviderFailureSafely,
+  type ProviderFailureReporter
+} from "../../observability/providerFailure.js";
 import type { ProviderResultCache } from "./cache.js";
 
 export const weatherSummaryCacheTtlMs = 4 * 60 * 60 * 1000;
@@ -21,7 +25,8 @@ export type WeatherEnrichmentResult =
 
 export async function createWeatherSummary(
   input: WeatherSummaryRequest,
-  provider: WeatherProvider
+  provider: WeatherProvider,
+  reportProviderFailure?: ProviderFailureReporter
 ): Promise<WeatherEnrichmentResult> {
   try {
     const weatherSummary = await provider.getDailySummary(input);
@@ -39,16 +44,31 @@ export async function createWeatherSummary(
     };
   } catch (error) {
     if (error instanceof WeatherProviderConfigurationError) {
+      reportProviderFailureSafely(reportProviderFailure, {
+        failureCategory: "configuration",
+        operation: "weather.summary",
+        provider: "openweather"
+      });
       throw error;
     }
 
     if (error instanceof WeatherProviderError) {
+      reportProviderFailureSafely(reportProviderFailure, {
+        failureCategory: "request_failed",
+        operation: "weather.summary",
+        provider: "openweather"
+      });
       return {
         status: "unavailable",
         weatherSummary: null
       };
     }
 
+    reportProviderFailureSafely(reportProviderFailure, {
+      failureCategory: "unexpected",
+      operation: "weather.summary",
+      provider: "openweather"
+    });
     return {
       status: "unavailable",
       weatherSummary: null
@@ -109,14 +129,15 @@ export function normalizeWeatherSummaryCacheInput(
 export async function createCachedWeatherSummary(
   input: WeatherSummaryRequest,
   provider: WeatherProvider,
-  cache: ProviderResultCache
+  cache: ProviderResultCache,
+  reportProviderFailure?: ProviderFailureReporter
 ): Promise<WeatherEnrichmentResult> {
   const result = await cache.getOrSet({
     provider: "openweather",
     operation: "weather.summary",
     input: normalizeWeatherSummaryCacheInput(input),
     ttlMs: weatherSummaryCacheTtlMs,
-    load: () => createWeatherSummary(input, provider),
+    load: () => createWeatherSummary(input, provider, reportProviderFailure),
     isCachedValue: isWeatherEnrichmentResult,
     shouldCache: (weatherResult) => weatherResult.status !== "unavailable"
   });

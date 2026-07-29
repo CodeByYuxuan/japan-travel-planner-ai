@@ -4,7 +4,9 @@ export type ApiEnvConfig = {
   apiPort: number;
   googleMapsApiKey: string | undefined;
   openAiApiKey: string | undefined;
+  openAiInputCostPerMillionTokens: number | null;
   openAiModel: string;
+  openAiOutputCostPerMillionTokens: number | null;
   rakutenAccessKey: string | undefined;
   rakutenAppId: string | undefined;
   sessionCookieSameSite: "Lax" | "None";
@@ -23,7 +25,9 @@ export const defaultApiEnv = {
   apiPort: 3001,
   googleMapsApiKey: undefined,
   openAiApiKey: undefined,
+  openAiInputCostPerMillionTokens: null,
   openAiModel: defaultOpenAiModel,
+  openAiOutputCostPerMillionTokens: null,
   rakutenAccessKey: undefined,
   rakutenAppId: undefined,
   sessionCookieSameSite: "Lax",
@@ -39,7 +43,9 @@ type ApiEnvSource = {
   API_PORT?: string | undefined;
   GOOGLE_MAPS_API_KEY?: string | undefined;
   OPENAI_API_KEY?: string | undefined;
+  OPENAI_INPUT_COST_PER_MILLION_TOKENS?: string | undefined;
   OPENAI_MODEL?: string | undefined;
+  OPENAI_OUTPUT_COST_PER_MILLION_TOKENS?: string | undefined;
   RAKUTEN_ACCESS_KEY?: string | undefined;
   RAKUTEN_API_KEY?: string | undefined;
   RAKUTEN_APP_ID?: string | undefined;
@@ -144,6 +150,25 @@ function parseOpenAiModel(value: string | undefined) {
   return rawModel;
 }
 
+function parseOptionalNonNegativeNumber(
+  name: string,
+  value: string | undefined
+) {
+  const rawValue = value?.trim();
+
+  if (rawValue === undefined || rawValue.length === 0) {
+    return null;
+  }
+
+  const parsedValue = Number(rawValue);
+
+  if (!Number.isFinite(parsedValue) || parsedValue < 0) {
+    throw new Error(`Invalid ${name}: expected a non-negative number.`);
+  }
+
+  return parsedValue;
+}
+
 function parseJwtSecret(
   value: string | undefined,
   nodeEnv: string | undefined
@@ -182,7 +207,15 @@ export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
     apiPort: resolveApiPort(env),
     googleMapsApiKey: parseOptionalSecret(env.GOOGLE_MAPS_API_KEY),
     openAiApiKey: parseOpenAiApiKey(env.OPENAI_API_KEY),
+    openAiInputCostPerMillionTokens: parseOptionalNonNegativeNumber(
+      "OPENAI_INPUT_COST_PER_MILLION_TOKENS",
+      env.OPENAI_INPUT_COST_PER_MILLION_TOKENS
+    ),
     openAiModel: parseOpenAiModel(env.OPENAI_MODEL),
+    openAiOutputCostPerMillionTokens: parseOptionalNonNegativeNumber(
+      "OPENAI_OUTPUT_COST_PER_MILLION_TOKENS",
+      env.OPENAI_OUTPUT_COST_PER_MILLION_TOKENS
+    ),
     rakutenAccessKey: parseOptionalSecret(env.RAKUTEN_ACCESS_KEY),
     rakutenAppId: parseOptionalSecret(
       env.RAKUTEN_APP_ID ?? env.RAKUTEN_API_KEY
