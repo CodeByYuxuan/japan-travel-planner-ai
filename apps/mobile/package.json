@@ -4,16 +4,18 @@
   "private": true,
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
+    "start": "pnpm --filter @japan-travel-planner/shared build && expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "build": "expo export --platform ios --platform android --output-dir dist",
+    "build": "pnpm --filter @japan-travel-planner/shared build && expo export --platform ios --platform android --output-dir dist",
     "typecheck": "pnpm --filter @japan-travel-planner/shared build && tsc --noEmit",
-    "test": "jest --runInBand"
+    "test": "pnpm --filter @japan-travel-planner/shared build && jest --runInBand"
   },
   "dependencies": {
     "@japan-travel-planner/shared": "workspace:*",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.8",
+    "expo-network": "~57.0.1",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.0",
@@ -30,6 +32,11 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@japan-travel-planner/shared$": "<rootDir>/../../packages/shared/src/index.ts",
+      "^\\./(apiError|itinerary|tripRequest)\\.js$": "<rootDir>/../../packages/shared/src/schemas/$1.ts",
+      "^\\./schemas/(.*)\\.js$": "<rootDir>/../../packages/shared/src/schemas/$1.ts"
+    },
     "setupFilesAfterEnv": [
       "<rootDir>/src/test/setup.ts"
     ],

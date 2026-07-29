@@ -1,5 +1,18 @@
 import type { PropsWithChildren } from "react";
 
+jest.mock("@react-native-async-storage/async-storage", () =>
+  jest.requireActual(
+    "@react-native-async-storage/async-storage/jest/async-storage-mock"
+  )
+);
+
+jest.mock("expo-network", () => ({
+  getNetworkStateAsync: jest.fn(async () => ({
+    isConnected: true,
+    isInternetReachable: true
+  }))
+}));
+
 jest.mock("react-native-safe-area-context", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { View } =
