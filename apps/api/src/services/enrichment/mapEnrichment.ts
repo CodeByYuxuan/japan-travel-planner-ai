@@ -5,6 +5,10 @@ import {
   type MapLinkInput,
   type MapsProvider
 } from "../../providers/maps/mapsProvider.js";
+import {
+  reportProviderFailureSafely,
+  type ProviderFailureReporter
+} from "../../observability/providerFailure.js";
 import type { ProviderResultCache } from "./cache.js";
 
 const defaultMapsProvider = createGoogleMapsProvider();
@@ -26,11 +30,17 @@ export function activityToMapLinkInput(activity: Activity): MapLinkInput {
 
 export function createMapLink(
   input: MapLinkInput,
-  provider: MapsProvider = defaultMapsProvider
+  provider: MapsProvider = defaultMapsProvider,
+  reportProviderFailure?: ProviderFailureReporter
 ) {
   try {
     return provider.createSearchLink(input);
   } catch {
+    reportProviderFailureSafely(reportProviderFailure, {
+      failureCategory: "unexpected",
+      operation: "maps.link",
+      provider: "google-maps"
+    });
     return null;
   }
 }
@@ -69,14 +79,15 @@ export function normalizeMapLinkCacheInput(input: MapLinkInput) {
 export async function createCachedMapLink(
   input: MapLinkInput,
   provider: MapsProvider,
-  cache: ProviderResultCache
+  cache: ProviderResultCache,
+  reportProviderFailure?: ProviderFailureReporter
 ) {
   const result = await cache.getOrSet({
     provider: "google-maps",
     operation: "maps.link",
     input: normalizeMapLinkCacheInput(input),
     ttlMs: mapLinkCacheTtlMs,
-    load: async () => createMapLink(input, provider),
+    load: async () => createMapLink(input, provider, reportProviderFailure),
     isCachedValue: isCachedMapLink
   });
 

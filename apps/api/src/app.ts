@@ -2,9 +2,14 @@ import cors from "cors";
 import express, { type RequestHandler } from "express";
 
 import { loadApiEnv, type ApiEnvConfig } from "./config/env.js";
-import { errorHandler } from "./middleware/errorHandler.js";
+import { createErrorHandler } from "./middleware/errorHandler.js";
 import { createRateLimitMiddleware } from "./middleware/rateLimit.js";
+import {
+  createRequestLogger,
+  getRequestId
+} from "./middleware/requestLogger.js";
 import { createSessionMiddleware } from "./middleware/session.js";
+import { createConsoleLogger, type AppLogger } from "./observability/logger.js";
 import type { HotelProvider } from "./providers/hotels/hotelProvider.js";
 import { createRakutenHotelProvider } from "./providers/hotels/rakutenHotelProvider.js";
 import {
@@ -51,6 +56,7 @@ export type CreateAppOptions = {
   aiItineraryService?: AiItineraryService;
   aiUsageLogger?: AiUsageLogger;
   hotelProvider?: HotelProvider;
+  logger?: AppLogger;
   mapsProvider?: MapsProvider;
   pdfExportService?: PdfExportService;
   providerResultCache?: ProviderResultCache;
@@ -63,6 +69,7 @@ export type CreateAppOptions = {
 
 export function createApp(options: CreateAppOptions = {}) {
   const env = options.env ?? loadApiEnv();
+  const logger = options.logger ?? createConsoleLogger();
   const sessionMiddleware =
     options.sessionMiddleware ??
     createSessionMiddleware({
@@ -70,7 +77,11 @@ export function createApp(options: CreateAppOptions = {}) {
       secret: env.jwtSecret,
       secure: env.sessionCookieSecure
     });
-  const aiUsageLogger = options.aiUsageLogger ?? createConsoleAiUsageLogger();
+  const aiUsageLogger =
+    options.aiUsageLogger ??
+    createConsoleAiUsageLogger({
+      sink: (entry) => logger.info(entry.event, entry)
+    });
   const aiItineraryService =
     options.aiItineraryService ??
     createAiItineraryService(env, {
@@ -80,13 +91,14 @@ export function createApp(options: CreateAppOptions = {}) {
     options.aiGenerationRateLimitMiddleware ??
     createRateLimitMiddleware({
       max: env.aiGenerationRateLimitMax,
-      onRateLimited: ({ identifier }) => {
+      onRateLimited: ({ identifier, request }) => {
         void recordAiUsageSafely(aiUsageLogger, {
           attempts: 0,
           estimatedCostUsd: null,
           model: null,
           outcome: "rate_limited",
           requestIdentifier: identifier,
+          requestId: getRequestId(request),
           tokenUsage: null
         });
       },
@@ -117,6 +129,11 @@ export function createApp(options: CreateAppOptions = {}) {
   const app = express();
 
   app.use(
+    createRequestLogger({
+      logger
+    })
+  );
+  app.use(
     cors({
       credentials: true,
       origin: env.webOrigin
@@ -128,6 +145,7 @@ export function createApp(options: CreateAppOptions = {}) {
     "/api/enrichment",
     createEnrichmentRouter({
       hotelProvider,
+      logger,
       mapsProvider,
       providerResultCache,
       routeProvider,
@@ -147,7 +165,7 @@ export function createApp(options: CreateAppOptions = {}) {
     sessionMiddleware,
     createTripsRouter(tripService, shareService, pdfExportService)
   );
-  app.use(errorHandler);
+  app.use(createErrorHandler(logger));
 
   return app;
 }

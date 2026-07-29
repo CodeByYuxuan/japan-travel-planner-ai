@@ -155,6 +155,62 @@ describe("AiItineraryService", () => {
     ]);
   });
 
+  test("reports combined token usage and configured estimated cost", async () => {
+    const { service, usageEntries } = createTestService(
+      [
+        {
+          text: "not valid json",
+          tokenUsage: {
+            inputTokens: 1_000,
+            outputTokens: 200,
+            totalTokens: 1_200
+          }
+        },
+        {
+          text: JSON.stringify(validModelOutput),
+          tokenUsage: {
+            inputTokens: 500,
+            outputTokens: 100,
+            totalTokens: 600
+          }
+        }
+      ],
+      {
+        inputCostPerMillionTokens: 2,
+        outputCostPerMillionTokens: 8
+      }
+    );
+
+    const result = await service.generateItinerary(representativeTripRequest, {
+      requestId: "request-123"
+    });
+
+    expect(result.metadata).toEqual({
+      attempts: 2,
+      estimatedCostUsd: 0.0054,
+      model: "gpt-test-model",
+      repaired: true,
+      tokenUsage: {
+        inputTokens: 1_500,
+        outputTokens: 300,
+        totalTokens: 1_800
+      }
+    });
+    expect(usageEntries).toEqual([
+      expect.objectContaining({
+        estimatedCostUsd: 0.0054,
+        failureCategory: null,
+        provider: "openai",
+        requestId: "request-123",
+        tokenUsage: {
+          inputTokens: 1_500,
+          outputTokens: 300,
+          totalTokens: 1_800
+        }
+      })
+    ]);
+  });
+
   test("returns a structured generation failure after invalid output and invalid repair", async () => {
     const { createResponse, service, usageEntries } = createTestService([
       "not valid json",
@@ -240,7 +296,27 @@ describe("AiItineraryService", () => {
   });
 });
 
-function createTestService(responses: Array<string | Error>): {
+function createTestService(
+  responses: Array<
+    | string
+    | Error
+    | {
+        text: string;
+        tokenUsage: {
+          inputTokens: number;
+          outputTokens: number;
+          totalTokens: number;
+        };
+      }
+  >,
+  pricing: {
+    inputCostPerMillionTokens: number | null;
+    outputCostPerMillionTokens: number | null;
+  } = {
+    inputCostPerMillionTokens: null,
+    outputCostPerMillionTokens: null
+  }
+): {
   createResponse: ReturnType<
     typeof vi.fn<AiItineraryProvider["createResponse"]>
   >;
@@ -263,7 +339,10 @@ function createTestService(responses: Array<string | Error>): {
 
       return {
         model: "gpt-test-model",
-        text: response
+        text: typeof response === "string" ? response : response.text,
+        ...(typeof response === "string"
+          ? {}
+          : { tokenUsage: response.tokenUsage })
       };
     }
   );
@@ -274,6 +353,7 @@ function createTestService(responses: Array<string | Error>): {
   return {
     createResponse,
     service: new AiItineraryService({
+      pricing,
       providerFactory: () => provider,
       usageLogger: createConsoleAiUsageLogger({
         clock: () => new Date("2026-01-01T00:00:00.000Z"),

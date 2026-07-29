@@ -15,6 +15,7 @@ describe("AI usage logger", () => {
         model: "gpt-test-model",
         outcome: "repaired_success",
         requestIdentifier: "203.0.113.10",
+        requestId: "request-123",
         tokenUsage: null,
         apiKey: "sk-secret-key",
         constraints: ["My private medical constraint"],
@@ -29,8 +30,11 @@ describe("AI usage logger", () => {
       attempts: 2,
       estimatedCostUsd: null,
       event: "ai_itinerary_usage",
+      failureCategory: null,
       model: "gpt-test-model",
       outcome: "repaired_success",
+      provider: "openai",
+      requestId: "request-123",
       timestamp: "2026-01-01T00:00:00.000Z",
       tokenUsage: null
     });
@@ -58,6 +62,8 @@ describe("AI usage logger", () => {
     expect(entry.attempts).toBeNull();
     expect(entry.estimatedCostUsd).toBeNull();
     expect(entry.model).toBeNull();
+    expect(entry.failureCategory).toBe("request_failed");
+    expect(entry.provider).toBe("openai");
     expect(entry.tokenUsage).toEqual({
       inputTokens: 100,
       totalTokens: 200

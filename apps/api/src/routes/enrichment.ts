@@ -2,7 +2,10 @@ import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 
 import { ApiError } from "../errors/ApiError.js";
+import { getRequestId } from "../middleware/requestLogger.js";
 import { validateRequest } from "../middleware/validateRequest.js";
+import type { AppLogger } from "../observability/logger.js";
+import { createProviderFailureReporter } from "../observability/providerFailure.js";
 import {
   HotelProviderConfigurationError,
   type HotelProvider
@@ -168,6 +171,7 @@ function asyncHandler(handler: RequestHandler): RequestHandler {
 
 export function createEnrichmentRouter(options: {
   hotelProvider: HotelProvider;
+  logger: AppLogger;
   mapsProvider: MapsProvider;
   providerResultCache: ProviderResultCache;
   routeProvider: RouteProvider;
@@ -183,7 +187,8 @@ export function createEnrichmentRouter(options: {
         const result = await createCachedHotelSuggestions(
           request.body,
           options.hotelProvider,
-          options.providerResultCache
+          options.providerResultCache,
+          createProviderFailureReporter(options.logger, getRequestId(request))
         );
 
         response.status(200).json(result);
@@ -209,7 +214,8 @@ export function createEnrichmentRouter(options: {
         mapUrl: await createCachedMapLink(
           request.body,
           options.mapsProvider,
-          options.providerResultCache
+          options.providerResultCache,
+          createProviderFailureReporter(options.logger, getRequestId(request))
         )
       });
     })
@@ -223,7 +229,8 @@ export function createEnrichmentRouter(options: {
         const result = await createCachedRouteHints(
           request.body,
           options.routeProvider,
-          options.providerResultCache
+          options.providerResultCache,
+          createProviderFailureReporter(options.logger, getRequestId(request))
         );
 
         response.status(200).json(result);
@@ -249,7 +256,8 @@ export function createEnrichmentRouter(options: {
         const result = await createCachedWeatherSummary(
           request.body,
           options.weatherProvider,
-          options.providerResultCache
+          options.providerResultCache,
+          createProviderFailureReporter(options.logger, getRequestId(request))
         );
 
         response.status(200).json(result);

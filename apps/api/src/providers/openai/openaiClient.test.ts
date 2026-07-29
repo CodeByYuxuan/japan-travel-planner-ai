@@ -111,7 +111,12 @@ describe("OpenAI provider client", () => {
 
   test("calls the injected Responses API client and returns normalized text", async () => {
     const create = vi.fn(async () => ({
-      output_text: "A concise model response."
+      output_text: "A concise model response.",
+      usage: {
+        input_tokens: 120,
+        output_tokens: 30,
+        total_tokens: 150
+      }
     }));
     const fakeClient = {
       responses: {
@@ -133,7 +138,12 @@ describe("OpenAI provider client", () => {
       })
     ).resolves.toEqual({
       model: "gpt-test-model",
-      text: "A concise model response."
+      text: "A concise model response.",
+      tokenUsage: {
+        inputTokens: 120,
+        outputTokens: 30,
+        totalTokens: 150
+      }
     });
     expect(create).toHaveBeenCalledWith({
       input: "Draft a short itinerary note.",

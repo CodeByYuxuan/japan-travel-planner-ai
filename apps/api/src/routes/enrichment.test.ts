@@ -6,6 +6,11 @@ import { apiErrorSchema } from "@japan-travel-planner/shared";
 import { createApp } from "../app.js";
 import { defaultApiEnv } from "../config/env.js";
 import {
+  createConsoleLogger,
+  type AppLogger,
+  type LogEntry
+} from "../observability/logger.js";
+import {
   HotelProviderError,
   type HotelProvider,
   type HotelSuggestion
@@ -54,6 +59,7 @@ const weatherSummary = {
 function createEnrichmentTestApp(
   options: {
     hotelProvider?: HotelProvider | undefined;
+    logger?: AppLogger | undefined;
     mapsProvider?: MapsProvider | undefined;
     providerResultCache?: ProviderResultCache | undefined;
     routeProvider?: RouteProvider | undefined;
@@ -62,6 +68,7 @@ function createEnrichmentTestApp(
 ) {
   return createApp({
     env: defaultApiEnv,
+    ...(options.logger !== undefined ? { logger: options.logger } : {}),
     providerResultCache:
       options.providerResultCache ?? createMemoryProviderResultCache(),
     ...(options.hotelProvider !== undefined
@@ -262,14 +269,24 @@ describe("POST /api/enrichment/hotels/suggestions", () => {
   });
 
   test("degrades provider failure to unavailable hotel suggestions", async () => {
+    const logEntries: LogEntry[] = [];
     const hotelProvider = {
       name: "test-hotel-provider",
       searchHotels: vi.fn(async () => {
         throw new HotelProviderError();
       })
     } satisfies HotelProvider;
-    const response = await request(createEnrichmentTestApp({ hotelProvider }))
+    const response = await request(
+      createEnrichmentTestApp({
+        hotelProvider,
+        logger: createConsoleLogger({
+          clock: () => new Date("2026-07-29T00:00:00.000Z"),
+          sink: (entry) => logEntries.push(entry)
+        })
+      })
+    )
       .post("/api/enrichment/hotels/suggestions")
+      .set("X-Request-Id", "hotel-request-123")
       .send({
         city: "Tokyo",
         endDate: "2026-04-08",
@@ -281,6 +298,17 @@ describe("POST /api/enrichment/hotels/suggestions", () => {
       hotelSuggestions: [],
       status: "unavailable"
     });
+    expect(logEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: "provider_failure",
+          failureCategory: "request_failed",
+          operation: "hotels.suggestions",
+          provider: "test-hotel-provider",
+          requestId: "hotel-request-123"
+        })
+      ])
+    );
   });
 
   test("returns empty hotel suggestions when provider has no matches", async () => {

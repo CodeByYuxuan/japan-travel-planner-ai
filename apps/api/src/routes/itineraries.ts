@@ -5,6 +5,7 @@ import {
 } from "@japan-travel-planner/shared";
 
 import { getClientRateLimitIdentifier } from "../middleware/rateLimit.js";
+import { getRequestId } from "../middleware/requestLogger.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import type { AiItineraryService } from "../services/aiItinerary/generateItinerary.js";
 import {
@@ -44,6 +45,7 @@ export function createItinerariesRouter(
           model: null,
           outcome: "validation_error",
           requestIdentifier: getClientRateLimitIdentifier(request),
+          requestId: getRequestId(request),
           tokenUsage: null
         });
       }
@@ -52,7 +54,8 @@ export function createItinerariesRouter(
       const result = await aiItineraryService.generateItinerary(
         request.body as TripRequest,
         {
-          requestIdentifier: getClientRateLimitIdentifier(request)
+          requestIdentifier: getClientRateLimitIdentifier(request),
+          requestId: getRequestId(request)
         }
       );
 
