@@ -46,7 +46,26 @@ jobs:
         run: pnpm test
 
       - name: Build
+        env:
+          DATABASE_URL: postgresql://ci-user:ci-database-secret@localhost:5432/ci
+          GOOGLE_MAPS_API_KEY: ci-google-maps-server-secret
+          JWT_SECRET: ci-jwt-server-secret-value
+          OPENAI_API_KEY: sk-ci-openai-server-secret-value
+          RAKUTEN_ACCESS_KEY: ci-rakuten-access-server-secret
+          RAKUTEN_APP_ID: ci-rakuten-app-server-secret
+          WEATHER_API_KEY: ci-weather-server-secret
         run: pnpm build
+
+      - name: Check client bundle for server secrets
+        env:
+          DATABASE_URL: postgresql://ci-user:ci-database-secret@localhost:5432/ci
+          GOOGLE_MAPS_API_KEY: ci-google-maps-server-secret
+          JWT_SECRET: ci-jwt-server-secret-value
+          OPENAI_API_KEY: sk-ci-openai-server-secret-value
+          RAKUTEN_ACCESS_KEY: ci-rakuten-access-server-secret
+          RAKUTEN_APP_ID: ci-rakuten-app-server-secret
+          WEATHER_API_KEY: ci-weather-server-secret
+        run: pnpm check:client-secrets
 
       - name: Install Playwright Chromium
         run: pnpm --filter @japan-travel-planner/web exec playwright install --with-deps chromium

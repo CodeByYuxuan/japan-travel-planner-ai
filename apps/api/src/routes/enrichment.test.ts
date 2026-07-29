@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import { apiErrorSchema } from "@japan-travel-planner/shared";
 
 import { createApp } from "../app.js";
-import { defaultApiEnv } from "../config/env.js";
+import { defaultApiEnv, type ApiEnvConfig } from "../config/env.js";
 import {
   createConsoleLogger,
   type AppLogger,
@@ -58,6 +58,7 @@ const weatherSummary = {
 
 function createEnrichmentTestApp(
   options: {
+    env?: ApiEnvConfig | undefined;
     hotelProvider?: HotelProvider | undefined;
     logger?: AppLogger | undefined;
     mapsProvider?: MapsProvider | undefined;
@@ -67,7 +68,7 @@ function createEnrichmentTestApp(
   } = {}
 ) {
   return createApp({
-    env: defaultApiEnv,
+    env: options.env ?? defaultApiEnv,
     ...(options.logger !== undefined ? { logger: options.logger } : {}),
     providerResultCache:
       options.providerResultCache ?? createMemoryProviderResultCache(),
@@ -360,6 +361,48 @@ describe("POST /api/enrichment/hotels/suggestions", () => {
     expect(secondResponse.status).toBe(200);
     expect(secondResponse.body).toEqual(firstResponse.body);
     expect(hotelProvider.searchHotels).toHaveBeenCalledTimes(1);
+  });
+
+  test("rate limits provider enrichment without affecting health", async () => {
+    const hotelProvider = {
+      name: "test-hotel-provider",
+      searchHotels: vi.fn(async () => [hotelSuggestion])
+    } satisfies HotelProvider;
+    const app = createEnrichmentTestApp({
+      env: {
+        ...defaultApiEnv,
+        providerRateLimitMax: 1,
+        providerRateLimitWindowMs: 60_000
+      },
+      hotelProvider
+    });
+    const payload = {
+      city: "Tokyo",
+      endDate: "2026-04-08",
+      startDate: "2026-04-06"
+    };
+
+    const firstResponse = await request(app)
+      .post("/api/enrichment/hotels/suggestions")
+      .send(payload);
+    const secondResponse = await request(app)
+      .post("/api/enrichment/hotels/suggestions")
+      .send(payload);
+    const healthResponse = await request(app).get("/api/health");
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(429);
+    expect(secondResponse.headers["retry-after"]).toBe("60");
+    expect(secondResponse.body).toEqual({
+      error: {
+        code: "PROVIDER_RATE_LIMITED",
+        details: {
+          retryAfterSeconds: 60
+        },
+        message: "Too many provider requests. Try again later."
+      }
+    });
+    expect(healthResponse.status).toBe(200);
   });
 });
 

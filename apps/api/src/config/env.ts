@@ -7,10 +7,13 @@ export type ApiEnvConfig = {
   openAiInputCostPerMillionTokens: number | null;
   openAiModel: string;
   openAiOutputCostPerMillionTokens: number | null;
+  providerRateLimitMax: number;
+  providerRateLimitWindowMs: number;
   rakutenAccessKey: string | undefined;
   rakutenAppId: string | undefined;
   sessionCookieSameSite: "Lax" | "None";
   sessionCookieSecure: boolean;
+  trustProxyHops: number;
   weatherApiKey: string | undefined;
   webOrigin: string;
   jwtSecret: string;
@@ -28,10 +31,13 @@ export const defaultApiEnv = {
   openAiInputCostPerMillionTokens: null,
   openAiModel: defaultOpenAiModel,
   openAiOutputCostPerMillionTokens: null,
+  providerRateLimitMax: 30,
+  providerRateLimitWindowMs: 60_000,
   rakutenAccessKey: undefined,
   rakutenAppId: undefined,
   sessionCookieSameSite: "Lax",
   sessionCookieSecure: false,
+  trustProxyHops: 0,
   weatherApiKey: undefined,
   webOrigin: "http://localhost:5173",
   jwtSecret: localDevelopmentJwtSecret
@@ -46,9 +52,12 @@ type ApiEnvSource = {
   OPENAI_INPUT_COST_PER_MILLION_TOKENS?: string | undefined;
   OPENAI_MODEL?: string | undefined;
   OPENAI_OUTPUT_COST_PER_MILLION_TOKENS?: string | undefined;
+  PROVIDER_RATE_LIMIT_MAX?: string | undefined;
+  PROVIDER_RATE_LIMIT_WINDOW_MS?: string | undefined;
   RAKUTEN_ACCESS_KEY?: string | undefined;
   RAKUTEN_API_KEY?: string | undefined;
   RAKUTEN_APP_ID?: string | undefined;
+  TRUST_PROXY_HOPS?: string | undefined;
   WEATHER_API_KEY?: string | undefined;
   WEB_ORIGIN?: string | undefined;
   JWT_SECRET?: string | undefined;
@@ -71,6 +80,35 @@ function parsePositiveIntegerEnv(options: {
 
   if (!Number.isSafeInteger(parsedValue) || parsedValue < 1) {
     throw new Error(`Invalid ${options.name}: expected a positive integer.`);
+  }
+
+  return parsedValue;
+}
+
+function parseNonNegativeIntegerEnv(options: {
+  defaultValue: number;
+  max: number;
+  name: string;
+  value: string | undefined;
+}) {
+  const rawValue = options.value?.trim() || String(options.defaultValue);
+
+  if (!/^\d+$/.test(rawValue)) {
+    throw new Error(
+      `Invalid ${options.name}: expected an integer between 0 and ${options.max}.`
+    );
+  }
+
+  const parsedValue = Number(rawValue);
+
+  if (
+    !Number.isSafeInteger(parsedValue) ||
+    parsedValue < 0 ||
+    parsedValue > options.max
+  ) {
+    throw new Error(
+      `Invalid ${options.name}: expected an integer between 0 and ${options.max}.`
+    );
   }
 
   return parsedValue;
@@ -216,12 +254,28 @@ export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
       "OPENAI_OUTPUT_COST_PER_MILLION_TOKENS",
       env.OPENAI_OUTPUT_COST_PER_MILLION_TOKENS
     ),
+    providerRateLimitMax: parsePositiveIntegerEnv({
+      defaultValue: defaultApiEnv.providerRateLimitMax,
+      name: "PROVIDER_RATE_LIMIT_MAX",
+      value: env.PROVIDER_RATE_LIMIT_MAX
+    }),
+    providerRateLimitWindowMs: parsePositiveIntegerEnv({
+      defaultValue: defaultApiEnv.providerRateLimitWindowMs,
+      name: "PROVIDER_RATE_LIMIT_WINDOW_MS",
+      value: env.PROVIDER_RATE_LIMIT_WINDOW_MS
+    }),
     rakutenAccessKey: parseOptionalSecret(env.RAKUTEN_ACCESS_KEY),
     rakutenAppId: parseOptionalSecret(
       env.RAKUTEN_APP_ID ?? env.RAKUTEN_API_KEY
     ),
     sessionCookieSameSite: isProduction ? "None" : "Lax",
     sessionCookieSecure: isProduction,
+    trustProxyHops: parseNonNegativeIntegerEnv({
+      defaultValue: defaultApiEnv.trustProxyHops,
+      max: 10,
+      name: "TRUST_PROXY_HOPS",
+      value: env.TRUST_PROXY_HOPS
+    }),
     weatherApiKey: parseWeatherApiKey(env.WEATHER_API_KEY),
     webOrigin: parseWebOrigin(env.WEB_ORIGIN),
     jwtSecret: parseJwtSecret(env.JWT_SECRET, env.NODE_ENV)
