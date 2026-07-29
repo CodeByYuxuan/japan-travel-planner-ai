@@ -8,9 +8,10 @@ describe("TripDetailScreen", () => {
     const onBack = jest.fn();
     const trip = mockTrips[0];
     const screen = await render(
-      <TripDetailScreen trip={trip} onBack={onBack} />
+      <TripDetailScreen dataSource="cache" trip={trip} onBack={onBack} />
     );
 
+    expect(screen.getByText("OFFLINE COPY")).toBeTruthy();
     expect(screen.getByText("Day 1: Tokyo")).toBeTruthy();
     expect(screen.getByText("Day 2: Kyoto")).toBeTruthy();
     expect(screen.getByText("Morning walk through Ueno Park")).toBeTruthy();

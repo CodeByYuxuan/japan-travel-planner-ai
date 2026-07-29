@@ -1,7 +1,10 @@
 import type { Activity, Itinerary } from "@japan-travel-planner/shared";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import type { MobileTripDataSource } from "../api/mobileApiClient";
+
 type TripDetailScreenProps = {
+  dataSource: MobileTripDataSource;
   trip: Itinerary;
   onBack: () => void;
 };
@@ -22,7 +25,11 @@ function formatCostLevel(costLevel: Activity["costLevel"]) {
     : `${costLevel.charAt(0).toUpperCase()}${costLevel.slice(1)} cost`;
 }
 
-export function TripDetailScreen({ trip, onBack }: TripDetailScreenProps) {
+export function TripDetailScreen({
+  dataSource,
+  trip,
+  onBack
+}: TripDetailScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Pressable
@@ -36,6 +43,18 @@ export function TripDetailScreen({ trip, onBack }: TripDetailScreenProps) {
       >
         <Text style={styles.backButtonText}>Back to trips</Text>
       </Pressable>
+
+      {dataSource === "cache" ? (
+        <View
+          accessibilityLabel="Offline cached itinerary"
+          style={styles.notice}
+        >
+          <Text style={styles.noticeTitle}>OFFLINE COPY</Text>
+          <Text style={styles.noticeText}>
+            This saved itinerary is available for read-only viewing.
+          </Text>
+        </View>
+      ) : null}
 
       <Text style={styles.eyebrow}>SAVED ITINERARY</Text>
       <Text accessibilityRole="header" style={styles.title}>
@@ -137,6 +156,25 @@ const styles = StyleSheet.create({
     color: "#264d55",
     fontSize: 14,
     fontWeight: "700"
+  },
+  notice: {
+    backgroundColor: "#fff4df",
+    borderColor: "#ddb568",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 20
+  },
+  noticeTitle: {
+    color: "#7a4d00",
+    fontSize: 11,
+    fontWeight: "800"
+  },
+  noticeText: {
+    color: "#654c24",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4
   },
   eyebrow: {
     color: "#d94e41",

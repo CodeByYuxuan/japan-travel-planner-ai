@@ -7,7 +7,11 @@ describe("TripListScreen", () => {
   it("renders saved trips and reports the selected trip", async () => {
     const onSelectTrip = jest.fn();
     const screen = await render(
-      <TripListScreen trips={mockTrips} onSelectTrip={onSelectTrip} />
+      <TripListScreen
+        dataSource="preview"
+        trips={mockTrips}
+        onSelectTrip={onSelectTrip}
+      />
     );
 
     expect(screen.getByText(mockTrips[0].title)).toBeTruthy();
@@ -22,9 +26,26 @@ describe("TripListScreen", () => {
 
   it("renders an empty state when no trips are available", async () => {
     const screen = await render(
-      <TripListScreen trips={[]} onSelectTrip={jest.fn()} />
+      <TripListScreen
+        dataSource="preview"
+        trips={[]}
+        onSelectTrip={jest.fn()}
+      />
     );
 
     expect(screen.getByText("No saved trips")).toBeTruthy();
+  });
+
+  it("labels cached trips as an offline read-only copy", async () => {
+    const screen = await render(
+      <TripListScreen
+        dataSource="cache"
+        trips={mockTrips}
+        onSelectTrip={jest.fn()}
+      />
+    );
+
+    expect(screen.getByText("OFFLINE COPY")).toBeTruthy();
+    expect(screen.getByText(/read-only/)).toBeTruthy();
   });
 });
