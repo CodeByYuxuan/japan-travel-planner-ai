@@ -116,11 +116,12 @@ The selected production targets are:
 
 Repository-level configuration lives in [vercel.json](vercel.json) and
 [render.yaml](render.yaml). Both provider projects use `main` as the production
-branch. Render waits for GitHub checks to pass and runs committed Prisma
-migrations before starting the new API release.
+branch. The checked-in Render Blueprint currently targets temporary free demo
+instances. Render waits for GitHub checks to pass and runs committed Prisma
+migrations as part of the API start command.
 
-Required environment variables, cost notes, first-deploy ordering, validation,
-and rollback guidance are documented in
+Required environment variables, free-tier lifecycle limits, first-deploy
+ordering, validation, and rollback guidance are documented in
 [docs/deployment.md](docs/deployment.md). Secret values must be configured in
 Vercel or Render and must never be committed.
 

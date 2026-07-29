@@ -892,6 +892,32 @@ Risk scale: `Low`, `Medium`, `High`.
 - Risk level: Medium.
 - Estimated complexity: M.
 
+### T-040: Configure Temporary Free Demo Deployment
+
+- Goal: Deploy the completed planner as a temporary no-cost demonstration.
+- Files likely involved:
+  - `render.yaml`
+  - `README.md`
+  - `docs/deployment.md`
+- Dependencies: T-036, T-039.
+- Acceptance criteria:
+  - Render API and PostgreSQL use supported free instance types.
+  - Prisma migrations run before the free API begins accepting traffic.
+  - Free-tier spin-down, storage, expiration, and backup limits are documented.
+  - Vercel and Render are connected to `main` without committing secrets.
+  - Deployed health, core workflow, and production smoke checks pass.
+- Tests to add or run:
+  - JSON and YAML configuration validation.
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - `pnpm test`
+  - `pnpm build`
+  - `pnpm test:e2e`
+  - `pnpm test:e2e:production`
+  - Staging production smoke workflow.
+- Risk level: Medium.
+- Estimated complexity: M.
+
 ## Recommended Build Order
 
 1. T-001 through T-006: unblock the repository and CI foundation.
@@ -904,3 +930,4 @@ Risk scale: `Low`, `Medium`, `High`.
 8. T-031 through T-033: add hotels, routes, and LINE after the core planner is stable.
 9. T-034 through T-035: add mobile app and offline read cache.
 10. T-036 through T-039: finish deployment, observability, security, and production smoke tests.
+11. T-040: configure and validate the temporary free demo deployment.

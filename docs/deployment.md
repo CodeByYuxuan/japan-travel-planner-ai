@@ -11,15 +11,28 @@ Ticket T-036 selects the following managed deployment targets:
 The Vercel project and Render Blueprint must both use the repository root. The
 configuration assumes the production branch is `main`.
 
-## Cost Notice
+## Temporary Free Demo
 
-The Render Blueprint selects a `starter` API service and a `basic-256mb`
-PostgreSQL database in the Singapore region. These are paid resources. Review
-current Render pricing before creating the Blueprint.
+The checked-in Blueprint selects `free` instances for the Render API and
+PostgreSQL database in the Singapore region. Use a personal Vercel project on
+the Hobby plan for the web app. This setup is for a temporary demonstration,
+not durable production.
 
-For a temporary demo, both plans can be changed to `free`, but a free API spins
-down when idle and a free Render PostgreSQL database expires after 30 days. Do
-not use the free database for durable production data.
+Render free instances have important operational limits:
+
+- The API spins down after 15 minutes without inbound traffic and can take about
+  one minute to wake.
+- A workspace receives 750 free web-service instance hours per month.
+- Only one free Render PostgreSQL database can be active per workspace.
+- The free database is limited to 1 GB and expires 30 days after creation.
+- An expired database has a 14-day upgrade grace period before deletion.
+- The free database has no backups or managed connection pooling.
+
+Do not store durable or irreplaceable data in this environment. Export any demo
+data that must be retained before the database expires. See the official
+[Render free-instance limits](https://render.com/docs/free),
+[Render Blueprint reference](https://render.com/docs/blueprint-spec), and
+[Vercel Hobby plan](https://vercel.com/docs/plans/hobby) before provisioning.
 
 ## Required Configuration
 
@@ -71,7 +84,7 @@ registrable domain and repeat the save/reopen smoke check.
 5. Enter the exact Vercel origin for `WEB_ORIGIN` and provide
    `OPENAI_API_KEY`.
 6. Wait for Render to provision PostgreSQL, build the API, run
-   `prisma migrate deploy`, and pass `/api/health`.
+   `prisma migrate deploy` from the API start command, and pass `/api/health`.
 7. Copy the Render API HTTPS URL into Vercel as `VITE_API_BASE_URL`, set
    `VITE_TRIP_DATA_MODE=api`, and redeploy the Vercel production deployment.
 
@@ -84,8 +97,9 @@ committed migrations only.
   `main`.
 - Render tracks `main` and uses `autoDeployTrigger: checksPass`, so the API
   deploy starts only after GitHub checks pass.
-- Render runs database migrations as its pre-deploy command before starting the
-  new API build.
+- Render free web services do not support pre-deploy commands. The API start
+  command runs idempotent committed migrations before starting the server.
+  This also runs after a cold start and can add to wake-up time.
 
 Provider Git integrations are the deployment mechanism for T-036. A duplicate
 GitHub Actions deployment workflow is intentionally not configured, which
@@ -169,6 +183,6 @@ and deletes it after validating the read-only share page.
 
 Vercel and Render both allow a manual redeploy from their dashboards. Use the
 provider dashboard to redeploy a known commit or restore a previous application
-deployment. Database migrations are forward-only; take a database backup before
-deploying a destructive migration and prepare a corrective migration instead of
-rolling the schema backward.
+deployment. Database migrations are forward-only. The free database has no
+managed backups, so export important demo data before a destructive migration
+and prepare a corrective migration instead of rolling the schema backward.
