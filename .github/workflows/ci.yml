@@ -17,6 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: japan_travel_planner_ai
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d japan_travel_planner_ai"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,3 +87,8 @@ jobs:
 
       - name: E2E
         run: pnpm --filter @japan-travel-planner/web test:e2e
+
+      - name: Production smoke E2E
+        env:
+          PRODUCTION_SMOKE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/japan_travel_planner_ai?schema=public
+        run: pnpm --filter @japan-travel-planner/web test:e2e:production

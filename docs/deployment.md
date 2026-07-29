@@ -122,6 +122,39 @@ project to be linked and its Production environment variables to be available.
 
 ## Post-Deployment Smoke Check
 
+The automated smoke test exercises the built web app against the real API and
+database while intercepting only AI generation and optional provider requests.
+This keeps the run deterministic and avoids third-party usage charges. Trip
+persistence, reopening, public sharing, and cleanup still use the deployed API.
+
+To run the same production-like flow locally, start PostgreSQL on port 5432 and
+run:
+
+```bash
+pnpm test:e2e:production
+```
+
+The local runner applies committed migrations, starts the API on port 3101,
+builds and previews the web app on port 4173, runs the smoke test, and deletes
+the trip it created. Override the database only when needed:
+
+```bash
+PRODUCTION_SMOKE_DATABASE_URL=postgresql://user:password@localhost:5432/database \
+  pnpm test:e2e:production
+```
+
+To test a deployed environment, use the GitHub Actions `Production smoke`
+workflow and provide the deployed web origin, or run:
+
+```bash
+PRODUCTION_SMOKE_BASE_URL=https://your-web.example.com \
+  pnpm test:e2e:production
+```
+
+The deployed web app must be configured for API mode and point at the deployed
+API. The smoke test intentionally writes one trip to the environment database
+and deletes it after validating the read-only share page.
+
 1. Request `https://<render-api>/api/health` and confirm HTTP 200 with
    `"status":"ok"`.
 2. Open the Vercel root page and confirm API mode is active.
