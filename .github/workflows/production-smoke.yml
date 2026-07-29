@@ -1,0 +1,44 @@
+name: Production smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Deployed web origin to test, such as a Vercel URL
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Staging core journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @japan-travel-planner/web exec playwright install --with-deps chromium
+
+      - name: Run production smoke
+        env:
+          PRODUCTION_SMOKE_BASE_URL: ${{ inputs.base_url }}
+        run: pnpm --filter @japan-travel-planner/web test:e2e:production
