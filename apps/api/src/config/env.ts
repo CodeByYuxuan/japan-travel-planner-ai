@@ -7,6 +7,8 @@ export type ApiEnvConfig = {
   openAiModel: string;
   rakutenAccessKey: string | undefined;
   rakutenAppId: string | undefined;
+  sessionCookieSameSite: "Lax" | "None";
+  sessionCookieSecure: boolean;
   weatherApiKey: string | undefined;
   webOrigin: string;
   jwtSecret: string;
@@ -24,6 +26,8 @@ export const defaultApiEnv = {
   openAiModel: defaultOpenAiModel,
   rakutenAccessKey: undefined,
   rakutenAppId: undefined,
+  sessionCookieSameSite: "Lax",
+  sessionCookieSecure: false,
   weatherApiKey: undefined,
   webOrigin: "http://localhost:5173",
   jwtSecret: localDevelopmentJwtSecret
@@ -43,6 +47,7 @@ type ApiEnvSource = {
   WEB_ORIGIN?: string | undefined;
   JWT_SECRET?: string | undefined;
   NODE_ENV?: string | undefined;
+  PORT?: string | undefined;
 };
 
 function parsePositiveIntegerEnv(options: {
@@ -65,12 +70,12 @@ function parsePositiveIntegerEnv(options: {
   return parsedValue;
 }
 
-function parseApiPort(value: string | undefined) {
+function parseApiPort(name: "API_PORT" | "PORT", value: string | undefined) {
   const rawPort = value?.trim() || String(defaultApiEnv.apiPort);
 
   if (!/^\d+$/.test(rawPort)) {
     throw new Error(
-      "Invalid API_PORT: expected an integer between 1 and 65535."
+      `Invalid ${name}: expected an integer between 1 and 65535.`
     );
   }
 
@@ -78,11 +83,23 @@ function parseApiPort(value: string | undefined) {
 
   if (!Number.isSafeInteger(apiPort) || apiPort < 1 || apiPort > 65535) {
     throw new Error(
-      "Invalid API_PORT: expected an integer between 1 and 65535."
+      `Invalid ${name}: expected an integer between 1 and 65535.`
     );
   }
 
   return apiPort;
+}
+
+function resolveApiPort(env: ApiEnvSource) {
+  if (env.API_PORT?.trim()) {
+    return parseApiPort("API_PORT", env.API_PORT);
+  }
+
+  if (env.PORT?.trim()) {
+    return parseApiPort("PORT", env.PORT);
+  }
+
+  return defaultApiEnv.apiPort;
 }
 
 function parseWebOrigin(value: string | undefined) {
@@ -149,6 +166,8 @@ function parseJwtSecret(
 }
 
 export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
+  const isProduction = env.NODE_ENV === "production";
+
   return {
     aiGenerationRateLimitMax: parsePositiveIntegerEnv({
       defaultValue: defaultApiEnv.aiGenerationRateLimitMax,
@@ -160,7 +179,7 @@ export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
       name: "AI_GENERATION_RATE_LIMIT_WINDOW_MS",
       value: env.AI_GENERATION_RATE_LIMIT_WINDOW_MS
     }),
-    apiPort: parseApiPort(env.API_PORT),
+    apiPort: resolveApiPort(env),
     googleMapsApiKey: parseOptionalSecret(env.GOOGLE_MAPS_API_KEY),
     openAiApiKey: parseOpenAiApiKey(env.OPENAI_API_KEY),
     openAiModel: parseOpenAiModel(env.OPENAI_MODEL),
@@ -168,6 +187,8 @@ export function loadApiEnv(env: ApiEnvSource = process.env): ApiEnvConfig {
     rakutenAppId: parseOptionalSecret(
       env.RAKUTEN_APP_ID ?? env.RAKUTEN_API_KEY
     ),
+    sessionCookieSameSite: isProduction ? "None" : "Lax",
+    sessionCookieSecure: isProduction,
     weatherApiKey: parseWeatherApiKey(env.WEATHER_API_KEY),
     webOrigin: parseWebOrigin(env.WEB_ORIGIN),
     jwtSecret: parseJwtSecret(env.JWT_SECRET, env.NODE_ENV)

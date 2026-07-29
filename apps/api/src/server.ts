@@ -4,9 +4,10 @@ import { loadApiEnv } from "./config/env.js";
 try {
   const env = loadApiEnv();
   const app = createApp({ env });
+  const host = "0.0.0.0";
 
-  app.listen(env.apiPort, () => {
-    console.log(`API server listening at http://localhost:${env.apiPort}`);
+  app.listen(env.apiPort, host, () => {
+    console.log(`API server listening at http://${host}:${env.apiPort}`);
   });
 } catch (error) {
   const message =

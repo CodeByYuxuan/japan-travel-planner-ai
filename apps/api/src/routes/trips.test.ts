@@ -5,7 +5,7 @@ import { apiErrorSchema } from "../../../../packages/shared/src/schemas/apiError
 
 import { createApp } from "../app.js";
 import { anonymousSessionCookieName } from "../auth/sessionCookie.js";
-import { defaultApiEnv } from "../config/env.js";
+import { defaultApiEnv, type ApiEnvConfig } from "../config/env.js";
 import type {
   CreateTripInput,
   TripOwner,
@@ -195,11 +195,11 @@ class InMemoryTripRepository implements TripRepository {
   }
 }
 
-function createTripsTestApp() {
+function createTripsTestApp(env: ApiEnvConfig = defaultApiEnv) {
   const repository = new InMemoryTripRepository();
 
   return createApp({
-    env: defaultApiEnv,
+    env,
     tripService: new TripService(repository)
   });
 }
@@ -229,6 +229,25 @@ describe("Trip CRUD API", () => {
 
     expect(response.status).toBe(201);
     expectAnonymousSessionCookie(response);
+  });
+
+  test("production session cookies support the cross-site web deployment", async () => {
+    const app = createTripsTestApp({
+      ...defaultApiEnv,
+      sessionCookieSameSite: "None",
+      sessionCookieSecure: true
+    });
+
+    const response = await request(app)
+      .post("/api/trips")
+      .send(validCreateTripPayload);
+    const sessionCookie = getSetCookieHeaders(response).find((cookie) =>
+      cookie.startsWith(`${anonymousSessionCookieName}=`)
+    );
+
+    expect(sessionCookie).toContain("HttpOnly");
+    expect(sessionCookie).toContain("SameSite=None");
+    expect(sessionCookie).toContain("Secure");
   });
 
   test("subsequent requests with the same cookie reuse the same owner session", async () => {

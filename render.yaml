@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: japan-travel-planner-api
+    runtime: node
+    plan: starter
+    region: singapore
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: corepack enable && corepack prepare pnpm@10.14.0 --activate && pnpm install --frozen-lockfile && pnpm --filter @japan-travel-planner/api build
+    preDeployCommand: pnpm --filter @japan-travel-planner/api exec prisma migrate deploy
+    startCommand: pnpm --filter @japan-travel-planner/api start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: japan-travel-planner-db
+          property: connectionString
+      - key: WEB_ORIGIN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.5
+
+databases:
+  - name: japan-travel-planner-db
+    plan: basic-256mb
+    region: singapore
+    postgresMajorVersion: "16"
+    databaseName: japan_travel_planner_ai
+    user: japan_travel_planner
+    ipAllowList: []

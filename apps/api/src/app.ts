@@ -66,7 +66,9 @@ export function createApp(options: CreateAppOptions = {}) {
   const sessionMiddleware =
     options.sessionMiddleware ??
     createSessionMiddleware({
-      secret: env.jwtSecret
+      sameSite: env.sessionCookieSameSite,
+      secret: env.jwtSecret,
+      secure: env.sessionCookieSecure
     });
   const aiUsageLogger = options.aiUsageLogger ?? createConsoleAiUsageLogger();
   const aiItineraryService =

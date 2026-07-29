@@ -9,10 +9,17 @@ export const defaultDatabaseUrl =
 
 type DatabaseEnv = {
   DATABASE_URL?: string | undefined;
+  NODE_ENV?: string | undefined;
 };
 
 export function loadDatabaseUrl(env: DatabaseEnv = process.env) {
-  const databaseUrl = env.DATABASE_URL?.trim() || defaultDatabaseUrl;
+  const configuredDatabaseUrl = env.DATABASE_URL?.trim();
+
+  if (!configuredDatabaseUrl && env.NODE_ENV === "production") {
+    throw new Error("Invalid DATABASE_URL: required when NODE_ENV=production.");
+  }
+
+  const databaseUrl = configuredDatabaseUrl || defaultDatabaseUrl;
 
   try {
     const parsedUrl = new URL(databaseUrl);
